@@ -48,21 +48,22 @@ SampleBase* CreateSample()
 AtmosphereSample::AtmosphereSample()
 {}
 
-void AtmosphereSample::GetEngineInitializationAttribs(RENDER_DEVICE_TYPE DeviceType, EngineCreateInfo& EngineCI, SwapChainDesc& SCDesc)
+void AtmosphereSample::ModifyEngineInitInfo(const ModifyEngineInitInfoAttribs& Attribs)
 {
-    SampleBase::GetEngineInitializationAttribs(DeviceType, EngineCI, SCDesc);
+    SampleBase::ModifyEngineInitInfo(Attribs);
 
-    EngineCI.Features.ComputeShaders = DEVICE_FEATURE_STATE_ENABLED;
-    EngineCI.Features.DepthClamp     = DEVICE_FEATURE_STATE_OPTIONAL;
+    Attribs.EngineCI.Features.ComputeShaders = DEVICE_FEATURE_STATE_ENABLED;
+    Attribs.EngineCI.Features.DepthClamp     = DEVICE_FEATURE_STATE_OPTIONAL;
 }
 
 void AtmosphereSample::Initialize(const SampleInitInfo& InitInfo)
 {
     SampleBase::Initialize(InitInfo);
 
-    const auto& deviceCaps = InitInfo.pDevice->GetDeviceCaps();
-    m_bIsGLDevice          = deviceCaps.IsGLDevice();
-    if (m_pDevice->GetDeviceCaps().DevType == RENDER_DEVICE_TYPE_GLES)
+    const auto& deviceInfo = InitInfo.pDevice->GetDeviceInfo();
+    m_bIsGLDevice          = deviceInfo.IsGLDevice();
+    const auto AdatperType = InitInfo.pDevice->GetAdapterInfo().Type;
+    if (AdatperType == ADAPTER_TYPE_INTEGRATED)
     {
         m_ShadowSettings.Resolution                        = 512;
         m_TerrainRenderParams.m_FilterAcrossShadowCascades = false;
@@ -123,7 +124,7 @@ void AtmosphereSample::Initialize(const SampleInitInfo& InitInfo)
     }
 
     const Char *strTileTexPaths[EarthHemsiphere::NUM_TILE_TEXTURES], *strNormalMapPaths[EarthHemsiphere::NUM_TILE_TEXTURES];
-    for (int iTile = 0; iTile < _countof(strTileTexPaths); ++iTile)
+    for (size_t iTile = 0; iTile < _countof(strTileTexPaths); ++iTile)
     {
         strTileTexPaths[iTile]   = m_strTileTexPaths[iTile].c_str();
         strNormalMapPaths[iTile] = m_strNormalMapTexPaths[iTile].c_str();
@@ -194,7 +195,7 @@ void AtmosphereSample::UpdateUI()
                 {
                     ImGui::Checkbox("Enable light shafts", &m_PPAttribs.bEnableLightShafts);
 
-                    static_assert(LIGHT_SCTR_TECHNIQUE_EPIPOLAR_SAMPLING == 0 && LIGHT_SCTR_TECHNIQUE_BRUTE_FORCE == 1, "Unexpcted value");
+                    static_assert(LIGHT_SCTR_TECHNIQUE_EPIPOLAR_SAMPLING == 0 && LIGHT_SCTR_TECHNIQUE_BRUTE_FORCE == 1, "Unexpected value");
                     ImGui::Combo("Light scattering tech", &m_PPAttribs.iLightSctrTechnique, "Epipolar\0"
                                                                                             "Brute force\0\0");
 
@@ -233,7 +234,7 @@ void AtmosphereSample::UpdateUI()
                         {
                             static constexpr Uint32 MinInitialStep = 4;
                             int                     SelectedItem   = PlatformMisc::GetLSB(m_PPAttribs.uiInitialSampleStepInSlice / MinInitialStep);
-                            if (ImGui::Combo("Intial Step", &SelectedItem,
+                            if (ImGui::Combo("Initial Step", &SelectedItem,
                                              "4\0"
                                              "8\0"
                                              "16\0"
@@ -302,18 +303,20 @@ void AtmosphereSample::UpdateUI()
                                   SINGLE_SCTR_MODE_INTEGRATION  == 1 &&
                                   SINGLE_SCTR_MODE_LUT          == 2, "Unexpected value");
                     // clang-format on
-                    ImGui::Combo("Single scattering mode", &m_PPAttribs.iSingleScatteringMode, "None\0"
-                                                                                               "Integration\0"
-                                                                                               "Look-up table\0\0");
+                    ImGui::Combo("Single scattering mode", &m_PPAttribs.iSingleScatteringMode,
+                                 "None\0"
+                                 "Integration\0"
+                                 "Look-up table\0\0");
 
                     // clang-format off
                     static_assert(MULTIPLE_SCTR_MODE_NONE        == 0 &&
                                   MULTIPLE_SCTR_MODE_UNOCCLUDED  == 1 &&
                                   MULTIPLE_SCTR_MODE_OCCLUDED    == 2, "Unexpected value");
                     // clang-format on
-                    ImGui::Combo("Higher-order scattering mode", &m_PPAttribs.iMultipleScatteringMode, "None\0"
-                                                                                                       "Unoccluded\0"
-                                                                                                       "Occluded\0\0");
+                    ImGui::Combo("Higher-order scattering mode", &m_PPAttribs.iMultipleScatteringMode,
+                                 "None\0"
+                                 "Unoccluded\0"
+                                 "Occluded\0\0");
 
                     // clang-format off
                     static_assert(CASCADE_PROCESSING_MODE_SINGLE_PASS     == 0 &&

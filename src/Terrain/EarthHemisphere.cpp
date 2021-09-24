@@ -252,13 +252,13 @@ public:
 
         // Prepare buffer description
         BufferDesc IndexBufferDesc;
-        IndexBufferDesc.Name          = "Ring mesh index buffer";
-        IndexBufferDesc.uiSizeInBytes = (Uint32)(IB.size() * sizeof(IB[0]));
-        IndexBufferDesc.BindFlags     = BIND_INDEX_BUFFER;
-        IndexBufferDesc.Usage         = USAGE_IMMUTABLE;
+        IndexBufferDesc.Name      = "Ring mesh index buffer";
+        IndexBufferDesc.Size      = (Uint32)(IB.size() * sizeof(IB[0]));
+        IndexBufferDesc.BindFlags = BIND_INDEX_BUFFER;
+        IndexBufferDesc.Usage     = USAGE_IMMUTABLE;
         BufferData IBInitData;
         IBInitData.pData    = IB.data();
-        IBInitData.DataSize = IndexBufferDesc.uiSizeInBytes;
+        IBInitData.DataSize = IndexBufferDesc.Size;
         // Create the buffer
         m_pDevice->CreateBuffer(IndexBufferDesc, &IBInitData, &CurrMesh.pIndBuff);
         VERIFY(CurrMesh.pIndBuff, "Failed to create index buffer");
@@ -786,13 +786,13 @@ void EarthHemsiphere::Create(class ElevationDataSource* pDataSource,
     GenerateSphereGeometry(pDevice, Diligent::AirScatteringAttribs().fEarthRadius, m_Params.m_iRingDimension, m_Params.m_iNumRings, pDataSource, m_Params.m_TerrainAttribs.m_fElevationSamplingInterval, m_Params.m_TerrainAttribs.m_fElevationScale, VB, m_SphereMeshes);
 
     BufferDesc VBDesc;
-    VBDesc.Name          = "Hemisphere vertex buffer";
-    VBDesc.uiSizeInBytes = (Uint32)(VB.size() * sizeof(VB[0]));
-    VBDesc.Usage         = USAGE_IMMUTABLE;
-    VBDesc.BindFlags     = BIND_VERTEX_BUFFER;
+    VBDesc.Name      = "Hemisphere vertex buffer";
+    VBDesc.Size      = static_cast<Uint64>(VB.size() * sizeof(VB[0]));
+    VBDesc.Usage     = USAGE_IMMUTABLE;
+    VBDesc.BindFlags = BIND_VERTEX_BUFFER;
     BufferData VBInitData;
     VBInitData.pData    = VB.data();
-    VBInitData.DataSize = VBDesc.uiSizeInBytes;
+    VBInitData.DataSize = VBDesc.Size;
     pDevice->CreateBuffer(VBDesc, &VBInitData, &m_pVertBuff);
     VERIFY(m_pVertBuff, "Failed to create VB");
 }
@@ -928,7 +928,7 @@ void EarthHemsiphere::Render(IDeviceContext*        pContext,
 
 
     ViewFrustumExt ViewFrustum;
-    auto           DevType = m_pDevice->GetDeviceCaps().DevType;
+    auto           DevType = m_pDevice->GetDeviceInfo().Type;
     ExtractViewFrustumPlanesFromMatrix(CameraViewProjMatrix, ViewFrustum, DevType == RENDER_DEVICE_TYPE_D3D11 || DevType == RENDER_DEVICE_TYPE_D3D12);
 
     {
@@ -958,9 +958,8 @@ void EarthHemsiphere::Render(IDeviceContext*        pContext,
 	pd3dImmediateContext->PSSetSamplers(0, _countof(pSamplers), pSamplers);
 #endif
 
-    Uint32   offset[1]    = {0};
     IBuffer* ppBuffers[1] = {m_pVertBuff};
-    pContext->SetVertexBuffers(0, 1, ppBuffers, offset, RESOURCE_STATE_TRANSITION_MODE_TRANSITION, SET_VERTEX_BUFFERS_FLAG_RESET);
+    pContext->SetVertexBuffers(0, 1, ppBuffers, nullptr, RESOURCE_STATE_TRANSITION_MODE_TRANSITION, SET_VERTEX_BUFFERS_FLAG_RESET);
 
     if (bZOnlyPass)
     {
