@@ -6,9 +6,9 @@ Set(PLATFORM_WIN32 True)
 add_compile_definitions(_DEBUG)
 add_compile_definitions(DEBUG)
 add_compile_definitions(PLATFORM_WIN32=1)
-add_compile_definitions(D3D11_SUPPORTED=1)
-add_compile_definitions(D3D12_SUPPORTED=1)
-add_compile_definitions(GL_SUPPORTED=1)
+add_compile_definitions(D3D11_SUPPORTED=0)
+add_compile_definitions(D3D12_SUPPORTED=0)
+add_compile_definitions(GL_SUPPORTED=0)
 add_compile_definitions(GLES_SUPPORTED=0)
 add_compile_definitions(VULKAN_SUPPORTED=1)
 add_compile_definitions(METAL_SUPPORTED=0)
@@ -26,6 +26,7 @@ include(BuildUtils.cmake)
 
 
 
+
 if(PLATFORM_WIN32)
 
     set(SOURCE 
@@ -37,7 +38,7 @@ if(PLATFORM_WIN32)
 
     function(add_win32_app TARGET_NAME SOURCE INCLUDE ASSETS)
         add_executable(${TARGET_NAME} WIN32 ${SOURCE} ${INCLUDE} ${ASSETS})
-
+		set_property(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} PROPERTY VS_STARTUP_PROJECT ${TARGET_NAME})
     endfunction()
 
     function(add_target_platform_app TARGET_NAME SOURCE INCLUDE ASSETS)
@@ -659,4 +660,3 @@ source_group("assets//shaders//terrain" FILES ${TERRAIN_SHADERS})
 source_group("assets//shaders" FILES ${SHADERS})
 source_group("assets//Terrain" FILES ${TERRAIN_TEXTURES})
 source_group("assets//Terrain//Tiles" FILES ${TERRAIN_TILES})
-
