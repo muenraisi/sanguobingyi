@@ -78,7 +78,7 @@ struct RenderingParams
 
     // Patch rendering params
     TEXTURING_MODE m_TexturingMode  = TM_MATERIAL_MASK_NM;
-    int            m_iRingDimension = 65;
+    int            m_iRingDimension = 65; // 4K+1
     int            m_iNumRings      = 15;
 
     int            m_iNumShadowCascades         = 6;
@@ -100,7 +100,6 @@ struct RingSectorMesh
         uiNumIndices(0) {}
 };
 
-// This class renders the adaptive model using DX11 API
 class EarthHemsiphere
 {
 public:
@@ -108,10 +107,11 @@ public:
         m_ValidShaders(0) {}
 
     // clang-format off
-    EarthHemsiphere             (const EarthHemsiphere&) = delete;
-    EarthHemsiphere& operator = (const EarthHemsiphere&) = delete;
-    EarthHemsiphere             (EarthHemsiphere&&)      = delete;
-    EarthHemsiphere& operator = (EarthHemsiphere&&)      = delete;
+    // 显式的禁用某个函数
+    EarthHemsiphere             (const EarthHemsiphere&) = delete; //默认复制构造禁用
+    EarthHemsiphere& operator = (const EarthHemsiphere&) = delete; //默认赋值构造禁用
+    EarthHemsiphere             (EarthHemsiphere&&)      = delete; //指针复制构造禁用
+    EarthHemsiphere& operator = (EarthHemsiphere&&)      = delete; //指针赋值构造禁用
     // clang-format on
 
     // Renders the model
@@ -129,9 +129,9 @@ public:
                 const RenderingParams&     Params,
                 IRenderDevice*             pDevice,
                 IDeviceContext*            pContext,
-                const char*                MaterialMaskPath,
-                const char*                TileTexturePath[],
-                const char*                TileNormalMapPath[],
+                const Char*                MaterialMaskPath,
+                const Char*                TileTexturePath[],
+                const Char*                TileNormalMapPath[],
                 IBuffer*                   pcbCameraAttribs,
                 IBuffer*                   pcbLightAttribs,
                 IBuffer*                   pcMediaScatteringParams);
@@ -146,7 +146,7 @@ private:
                          IDeviceContext* pd3dImmediateContext,
                          const Uint16*   pHeightMap,
                          size_t          HeightMapPitch,
-                         int             HeightMapDim,
+                         size_t          HeightMapDim,
                          ITexture*       ptex2DNormalMap);
 
     RenderingParams m_Params;

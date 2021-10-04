@@ -100,7 +100,7 @@ ElevationDataSource::ElevationDataSource(const Char* strSrcDemFile) :
         memcpy(&m_TheHeightMap[row * m_iStride], pSrcImgData, size_t{ImgInfo.Width} * size_t{GetValueSize(ImgInfo.ComponentType)});
     }
 
-    // Duplicate the last row and column
+    // Duplicate the last row and column, why?
     for (Uint32 iRow = 0; iRow < ImgInfo.Height; iRow++)
         for (Uint32 iCol = ImgInfo.Width; iCol < m_iNumCols; iCol++)
             GetElevSample(iCol, iRow) = GetElevSample((ImgInfo.Width - 1), iRow);

@@ -77,9 +77,9 @@ struct HemisphereVertex
         f3WorldPos(0, 0, 0), f2MaskUV0(0, 0) {}
 };
 
-enum QUAD_TRIANGULATION_TYPE
+enum class QUAD_TRIANGULATION_TYPE
 {
-    QUAD_TRIANG_TYPE_UNDEFINED = 0,
+    UNDEFINED = 0,
 
     // 01      11
     //  *------*
@@ -87,7 +87,7 @@ enum QUAD_TRIANGULATION_TYPE
     //  | .'   |
     //  * -----*
     // 00      10
-    QUAD_TRIANG_TYPE_00_TO_11,
+    FROM_00_TO_11,
 
     // 01      11
     //  *------*
@@ -95,7 +95,7 @@ enum QUAD_TRIANGULATION_TYPE
     //  |   '. |
     //  * -----*
     // 00      10
-    QUAD_TRIANG_TYPE_01_TO_10
+    FROM_01_TO_10
 };
 
 template <typename IndexType, class IndexGenerator>
@@ -103,7 +103,7 @@ class TriStrip
 {
 public:
     TriStrip(std::vector<IndexType>& Indices, IndexGenerator indexGenerator) :
-        m_QuadTriangType(QUAD_TRIANG_TYPE_UNDEFINED),
+        m_QuadTriangType(QUAD_TRIANGULATION_TYPE::UNDEFINED),
         m_Indices(Indices),
         m_IndexGenerator(indexGenerator)
     {
@@ -116,9 +116,9 @@ public:
                   int                     iNumRows,
                   QUAD_TRIANGULATION_TYPE QuadTriangType)
     {
-        VERIFY_EXPR(QuadTriangType == QUAD_TRIANG_TYPE_00_TO_11 || QuadTriangType == QUAD_TRIANG_TYPE_01_TO_10);
-        int iFirstVertex = iBaseIndex + m_IndexGenerator(iStartCol, iStartRow + (QuadTriangType == QUAD_TRIANG_TYPE_00_TO_11 ? 1 : 0));
-        if (m_QuadTriangType != QUAD_TRIANG_TYPE_UNDEFINED)
+        VERIFY_EXPR(QuadTriangType == QUAD_TRIANGULATION_TYPE::FROM_00_TO_11 || QuadTriangType == QUAD_TRIANGULATION_TYPE::FROM_01_TO_10);
+        int iFirstVertex = iBaseIndex + m_IndexGenerator(iStartCol, iStartRow + (QuadTriangType == QUAD_TRIANGULATION_TYPE::FROM_00_TO_11 ? 1 : 0)); //can replace with (QuadTriangType == QUAD_TRIANG_TYPE_00_TO_11 ? 0 : 1) ?
+        if (m_QuadTriangType != QUAD_TRIANGULATION_TYPE::UNDEFINED)
         {
             // To move from one strip to another, we have to generate two degenerate triangles
             // by duplicating the last vertex in previous strip and the first vertex in new strip
@@ -126,8 +126,8 @@ public:
             m_Indices.push_back(iFirstVertex);
         }
 
-        if ((m_QuadTriangType != QUAD_TRIANG_TYPE_UNDEFINED && m_QuadTriangType != QuadTriangType) ||
-            (m_QuadTriangType == QUAD_TRIANG_TYPE_UNDEFINED && QuadTriangType == QUAD_TRIANG_TYPE_01_TO_10))
+        if ((m_QuadTriangType != QUAD_TRIANGULATION_TYPE::UNDEFINED && m_QuadTriangType != QuadTriangType) ||
+            (m_QuadTriangType == QUAD_TRIANGULATION_TYPE::UNDEFINED && QuadTriangType == QUAD_TRIANGULATION_TYPE::FROM_01_TO_10))
         {
             // If triangulation orientation changes, or if start strip orientation is 01 to 10,
             // we also have to add one additional vertex to preserve winding order
@@ -141,7 +141,7 @@ public:
             {
                 int iV00 = iBaseIndex + m_IndexGenerator(iStartCol + iCol, iStartRow + iRow);
                 int iV01 = iBaseIndex + m_IndexGenerator(iStartCol + iCol, iStartRow + iRow + 1);
-                if (m_QuadTriangType == QUAD_TRIANG_TYPE_01_TO_10)
+                if (m_QuadTriangType == QUAD_TRIANGULATION_TYPE::FROM_01_TO_10)
                 {
                     if (iCol == 0 && iRow == 0)
                         VERIFY_EXPR(iFirstVertex == iV00);
@@ -154,7 +154,7 @@ public:
                     m_Indices.push_back(iV00);
                     m_Indices.push_back(iV01);
                 }
-                else if (m_QuadTriangType == QUAD_TRIANG_TYPE_00_TO_11)
+                else if (m_QuadTriangType == QUAD_TRIANGULATION_TYPE::FROM_00_TO_11)
                 {
                     if (iCol == 0 && iRow == 0)
                         VERIFY_EXPR(iFirstVertex == iV01);
@@ -176,7 +176,7 @@ public:
             if (iRow < iNumRows - 2)
             {
                 m_Indices.push_back(m_Indices.back());
-                m_Indices.push_back(iBaseIndex + m_IndexGenerator(iStartCol, iStartRow + iRow + 1 + (QuadTriangType == QUAD_TRIANG_TYPE_00_TO_11 ? 1 : 0)));
+                m_Indices.push_back(iBaseIndex + m_IndexGenerator(iStartCol, iStartRow + iRow + 1 + (QuadTriangType == QUAD_TRIANGULATION_TYPE::FROM_00_TO_11 ? 1 : 0)));
             }
         }
     }
@@ -239,7 +239,7 @@ public:
                     int                          iStartRow,
                     int                          iNumCols,
                     int                          iNumRows,
-                    enum QUAD_TRIANGULATION_TYPE QuadTriangType)
+                    QUAD_TRIANGULATION_TYPE QuadTriangType)
     {
         m_RingMeshes.push_back(RingSectorMesh());
         auto& CurrMesh = m_RingMeshes.back();
@@ -279,15 +279,15 @@ public:
 private:
     RefCntAutoPtr<IRenderDevice>         m_pDevice;
     std::vector<RingSectorMesh>&         m_RingMeshes;
-    const std::vector<HemisphereVertex>& m_VB;
+    const std::vector<HemisphereVertex>& m_VB; //vertex buffer
     const int                            m_iGridDimenion;
 };
 
 
 void GenerateSphereGeometry(IRenderDevice*                 pDevice,
                             const float                    fEarthRadius,
-                            int                            iGridDimension,
-                            const int                      iNumRings,
+                            size_t                         iGridDimension,
+                            const size_t                   iNumRings,
                             class ElevationDataSource*     pDataSource,
                             float                          fSamplingStep,
                             float                          fSampleScale,
@@ -297,27 +297,26 @@ void GenerateSphereGeometry(IRenderDevice*                 pDevice,
     if ((iGridDimension - 1) % 4 != 0)
     {
         iGridDimension = RenderingParams().m_iRingDimension;
-        UNEXPECTED("Grid dimension must be 4k+1. Defaulting to ", iGridDimension);
+        UNEXPECTED("Grid dimension must be 4k+1. Defaulting to ", iGridDimension); //why and what is grid dimension
     }
-    const int iGridMidst = (iGridDimension - 1) / 2;
-    const int iGridQuart = (iGridDimension - 1) / 4;
+    const size_t iGridMidst = (iGridDimension - 1) / 2;
+    const size_t iGridQuart = (iGridDimension - 1) / 4;
 
     //const int iLargestGridScale = iGridDimension << (iNumRings-1);
 
     RingMeshBuilder RingMeshBuilder(pDevice, VB, iGridDimension, SphereMeshes);
-
-    int iStartRing = 0;
+    size_t iStartRing = 0;
     VB.reserve((iNumRings - iStartRing) * iGridDimension * iGridDimension);
-    for (int iRing = iStartRing; iRing < iNumRings; ++iRing)
+    for (size_t iRing = iStartRing; iRing < iNumRings; ++iRing)
     {
-        int iCurrGridStart = (int)VB.size();
-        VB.resize(VB.size() + iGridDimension * iGridDimension);
+        size_t iCurrGridStart = VB.size();
+        VB.resize(VB.size() +iGridDimension * iGridDimension);
         float fGridScale = 1.f / (float)(1 << (iNumRings - 1 - iRing));
         // Fill vertex buffer
-        for (int iRow = 0; iRow < iGridDimension; ++iRow)
-            for (int iCol = 0; iCol < iGridDimension; ++iCol)
+        for (size_t iRow = 0; iRow < iGridDimension; ++iRow)
+            for (size_t iCol = 0; iCol < iGridDimension; ++iCol)
             {
-                auto& CurrVert = VB[iCurrGridStart + iCol + iRow * iGridDimension];
+                auto& CurrVert = VB[static_cast<size_t>(iCurrGridStart + iCol + iRow * iGridDimension)];
                 auto& f3Pos    = CurrVert.f3WorldPos;
 
                 f3Pos.x = static_cast<float>(iCol) / static_cast<float>(iGridDimension - 1);
@@ -352,7 +351,7 @@ void GenerateSphereGeometry(IRenderDevice*                 pDevice,
         // Align vertices on the outer boundary
         if (iRing < iNumRings - 1)
         {
-            for (int i = 1; i < iGridDimension - 1; i += 2)
+            for (size_t i = 1; i < iGridDimension - 1; i += 2)
             {
                 // Top & bottom boundaries
                 for (int iRow = 0; iRow < iGridDimension; iRow += iGridDimension - 1)
@@ -364,7 +363,7 @@ void GenerateSphereGeometry(IRenderDevice*                 pDevice,
                 }
 
                 // Left & right boundaries
-                for (int iCol = 0; iCol < iGridDimension; iCol += iGridDimension - 1)
+                for (size_t iCol = 0; iCol < iGridDimension; iCol += iGridDimension - 1)
                 {
                     const auto& V0 = VB[iCurrGridStart + iCol + (i - 1) * iGridDimension].f3WorldPos;
                     auto&       V1 = VB[iCurrGridStart + iCol + (i + 0) * iGridDimension].f3WorldPos;
@@ -379,32 +378,32 @@ void GenerateSphereGeometry(IRenderDevice*                 pDevice,
         if (iRing == 0)
         {
             // clang-format off
-            RingMeshBuilder.CreateMesh(iCurrGridStart, 0,                   0, iGridMidst+1, iGridMidst+1, QUAD_TRIANG_TYPE_00_TO_11);
-            RingMeshBuilder.CreateMesh(iCurrGridStart, iGridMidst,          0, iGridMidst+1, iGridMidst+1, QUAD_TRIANG_TYPE_01_TO_10);
-            RingMeshBuilder.CreateMesh(iCurrGridStart, 0,          iGridMidst, iGridMidst+1, iGridMidst+1, QUAD_TRIANG_TYPE_01_TO_10);
-            RingMeshBuilder.CreateMesh(iCurrGridStart, iGridMidst, iGridMidst, iGridMidst+1, iGridMidst+1, QUAD_TRIANG_TYPE_00_TO_11);
+            RingMeshBuilder.CreateMesh(iCurrGridStart, 0,                   0, iGridMidst+1, iGridMidst+1, QUAD_TRIANGULATION_TYPE::FROM_00_TO_11);
+            RingMeshBuilder.CreateMesh(iCurrGridStart, iGridMidst,          0, iGridMidst+1, iGridMidst+1, QUAD_TRIANGULATION_TYPE::FROM_01_TO_10);
+            RingMeshBuilder.CreateMesh(iCurrGridStart, 0,          iGridMidst, iGridMidst+1, iGridMidst+1, QUAD_TRIANGULATION_TYPE::FROM_01_TO_10);
+            RingMeshBuilder.CreateMesh(iCurrGridStart, iGridMidst, iGridMidst, iGridMidst+1, iGridMidst+1, QUAD_TRIANGULATION_TYPE::FROM_00_TO_11);
             // clang-format on
         }
         else
         {
             // clang-format off
-            RingMeshBuilder.CreateMesh(iCurrGridStart,            0,            0,   iGridQuart+1, iGridQuart+1, QUAD_TRIANG_TYPE_00_TO_11);
-            RingMeshBuilder.CreateMesh(iCurrGridStart,   iGridQuart,            0,   iGridQuart+1, iGridQuart+1, QUAD_TRIANG_TYPE_00_TO_11);
+            RingMeshBuilder.CreateMesh(iCurrGridStart,            0,            0,   iGridQuart+1, iGridQuart+1, QUAD_TRIANGULATION_TYPE::FROM_00_TO_11);
+            RingMeshBuilder.CreateMesh(iCurrGridStart,   iGridQuart,            0,   iGridQuart+1, iGridQuart+1, QUAD_TRIANGULATION_TYPE::FROM_00_TO_11);
 
-            RingMeshBuilder.CreateMesh(iCurrGridStart,   iGridMidst,            0,   iGridQuart+1, iGridQuart+1, QUAD_TRIANG_TYPE_01_TO_10);
-            RingMeshBuilder.CreateMesh(iCurrGridStart, iGridQuart*3,            0,   iGridQuart+1, iGridQuart+1, QUAD_TRIANG_TYPE_01_TO_10);
+            RingMeshBuilder.CreateMesh(iCurrGridStart,   iGridMidst,            0,   iGridQuart+1, iGridQuart+1, QUAD_TRIANGULATION_TYPE::FROM_01_TO_10);
+            RingMeshBuilder.CreateMesh(iCurrGridStart, iGridQuart*3,            0,   iGridQuart+1, iGridQuart+1, QUAD_TRIANGULATION_TYPE::FROM_01_TO_10);
                                        
-            RingMeshBuilder.CreateMesh(iCurrGridStart,            0,   iGridQuart,   iGridQuart+1, iGridQuart+1, QUAD_TRIANG_TYPE_00_TO_11);
-            RingMeshBuilder.CreateMesh(iCurrGridStart,            0,   iGridMidst,   iGridQuart+1, iGridQuart+1, QUAD_TRIANG_TYPE_01_TO_10);
+            RingMeshBuilder.CreateMesh(iCurrGridStart,            0,   iGridQuart,   iGridQuart+1, iGridQuart+1, QUAD_TRIANGULATION_TYPE::FROM_00_TO_11);
+            RingMeshBuilder.CreateMesh(iCurrGridStart,            0,   iGridMidst,   iGridQuart+1, iGridQuart+1, QUAD_TRIANGULATION_TYPE::FROM_01_TO_10);
                                        
-            RingMeshBuilder.CreateMesh(iCurrGridStart, iGridQuart*3,   iGridQuart,   iGridQuart+1, iGridQuart+1, QUAD_TRIANG_TYPE_01_TO_10);
-            RingMeshBuilder.CreateMesh(iCurrGridStart, iGridQuart*3,   iGridMidst,   iGridQuart+1, iGridQuart+1, QUAD_TRIANG_TYPE_00_TO_11);
+            RingMeshBuilder.CreateMesh(iCurrGridStart, iGridQuart*3,   iGridQuart,   iGridQuart+1, iGridQuart+1, QUAD_TRIANGULATION_TYPE::FROM_01_TO_10);
+            RingMeshBuilder.CreateMesh(iCurrGridStart, iGridQuart*3,   iGridMidst,   iGridQuart+1, iGridQuart+1, QUAD_TRIANGULATION_TYPE::FROM_00_TO_11);
 
-            RingMeshBuilder.CreateMesh(iCurrGridStart,            0, iGridQuart*3,   iGridQuart+1, iGridQuart+1, QUAD_TRIANG_TYPE_01_TO_10);
-            RingMeshBuilder.CreateMesh(iCurrGridStart,   iGridQuart, iGridQuart*3,   iGridQuart+1, iGridQuart+1, QUAD_TRIANG_TYPE_01_TO_10);
+            RingMeshBuilder.CreateMesh(iCurrGridStart,            0, iGridQuart*3,   iGridQuart+1, iGridQuart+1, QUAD_TRIANGULATION_TYPE::FROM_01_TO_10);
+            RingMeshBuilder.CreateMesh(iCurrGridStart,   iGridQuart, iGridQuart*3,   iGridQuart+1, iGridQuart+1, QUAD_TRIANGULATION_TYPE::FROM_01_TO_10);
 
-            RingMeshBuilder.CreateMesh(iCurrGridStart,   iGridMidst, iGridQuart*3,   iGridQuart+1, iGridQuart+1, QUAD_TRIANG_TYPE_00_TO_11);
-            RingMeshBuilder.CreateMesh(iCurrGridStart, iGridQuart*3, iGridQuart*3,   iGridQuart+1, iGridQuart+1, QUAD_TRIANG_TYPE_00_TO_11);
+            RingMeshBuilder.CreateMesh(iCurrGridStart,   iGridMidst, iGridQuart*3,   iGridQuart+1, iGridQuart+1, QUAD_TRIANGULATION_TYPE::FROM_00_TO_11);
+            RingMeshBuilder.CreateMesh(iCurrGridStart, iGridQuart*3, iGridQuart*3,   iGridQuart+1, iGridQuart+1, QUAD_TRIANGULATION_TYPE::FROM_00_TO_11);
             // clang-format on
         }
     }
@@ -493,7 +492,7 @@ void EarthHemsiphere::RenderNormalMap(IRenderDevice*  pDevice,
                                       IDeviceContext* pContext,
                                       const Uint16*   pHeightMap,
                                       size_t          HeightMapPitch,
-                                      int             iHeightMapDim,
+                                      size_t          iHeightMapDim,
                                       ITexture*       ptex2DNormalMap)
 {
     TextureDesc HeightMapDesc;
@@ -516,17 +515,17 @@ void EarthHemsiphere::RenderNormalMap(IRenderDevice*  pDevice,
     Uint16*       pCurrMipLevel  = &CoarseMipLevels[0];
     size_t        FinerMipPitch  = HeightMapPitch;
     size_t        CurrMipPitch   = iHeightMapDim / 2;
-    for (Uint32 uiMipLevel = 1; uiMipLevel < HeightMapDesc.MipLevels; ++uiMipLevel)
+    for (size_t uiMipLevel = 1; uiMipLevel < HeightMapDesc.MipLevels; ++uiMipLevel)
     {
         auto MipWidth  = HeightMapDesc.Width >> uiMipLevel;
         auto MipHeight = HeightMapDesc.Height >> uiMipLevel;
-        for (Uint32 uiRow = 0; uiRow < MipHeight; ++uiRow)
+        for (size_t uiRow = 0; uiRow < MipHeight; ++uiRow)
         {
-            for (Uint32 uiCol = 0; uiCol < MipWidth; ++uiCol)
+            for (size_t uiCol = 0; uiCol < MipWidth; ++uiCol)
             {
                 int iAverageHeight = 0;
-                for (int i = 0; i < 2; ++i)
-                    for (int j = 0; j < 2; ++j)
+                for (size_t i = 0; i < 2; ++i)
+                    for (size_t j = 0; j < 2; ++j)
                         iAverageHeight += pFinerMipLevel[(uiCol * 2 + i) + (uiRow * 2 + j) * size_t{FinerMipPitch}];
                 pCurrMipLevel[uiCol + uiRow * CurrMipPitch] = (Uint16)(iAverageHeight >> 2);
             }
@@ -641,7 +640,6 @@ void EarthHemsiphere::RenderNormalMap(IRenderDevice*  pDevice,
     // Remove elevation map from resource mapping to release the resource
     m_pResMapping->RemoveResourceByName("g_tex2DElevationMap");
 }
-
 
 void EarthHemsiphere::Create(class ElevationDataSource* pDataSource,
                              const RenderingParams&     Params,

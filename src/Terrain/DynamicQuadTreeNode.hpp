@@ -62,14 +62,25 @@ struct QuadTreeNodeLocation
     QuadTreeNodeLocation(int h, int v, int l) :
         horzOrder(h), vertOrder(v), level(l)
     {
-        VERIFY_EXPR(h < (1 << l));
-        VERIFY_EXPR(v < (1 << l));
+        VERIFY_EXPR(h < (1 << l)); // h< 2^l
+        VERIFY_EXPR(v < (1 << l)); // v< 2^l
     }
     QuadTreeNodeLocation() :
         horzOrder(0), vertOrder(0), level(0)
     {}
 
     // Gets location of a child
+    /*
+    -----------------
+    |       |       |
+    |   2   |   3   |
+    |       |       |
+    -----------------
+    |       |       |
+    |   0   |   1   |
+    |       |       |
+    -----------------
+    */
     inline friend QuadTreeNodeLocation GetChildLocation(const QuadTreeNodeLocation& parent,
                                                         unsigned int                siblingOrder)
     {
@@ -225,17 +236,7 @@ private:
     QuadTreeNodeLocation m_pos;
 };
 
-template <typename NodeDataType>
-void DynamicQuadTreeNode<NodeDataType>::CreateFloatingDescendants(AutoPtrType& pLBDescendant,
-                                                                  AutoPtrType& pRBDescendant,
-                                                                  AutoPtrType& pLTDescendant,
-                                                                  AutoPtrType& pRTDescendant)
-{
-    pLBDescendant.reset(new DynamicQuadTreeNode<NodeDataType>(this, 0));
-    pRBDescendant.reset(new DynamicQuadTreeNode<NodeDataType>(this, 1));
-    pLTDescendant.reset(new DynamicQuadTreeNode<NodeDataType>(this, 2));
-    pRTDescendant.reset(new DynamicQuadTreeNode<NodeDataType>(this, 3));
-}
+
 
 template <typename NodeDataType>
 void DynamicQuadTreeNode<NodeDataType>::CreateDescendants(AutoPtrType pLBDescendant,
@@ -252,6 +253,18 @@ void DynamicQuadTreeNode<NodeDataType>::CreateDescendants(AutoPtrType pLBDescend
     m_pRBDescendant = pRBDescendant;
     m_pLTDescendant = pLTDescendant;
     m_pRTDescendant = pRTDescendant;
+}
+
+template <typename NodeDataType>
+void DynamicQuadTreeNode<NodeDataType>::CreateFloatingDescendants(AutoPtrType& pLBDescendant,
+  AutoPtrType& pRBDescendant,
+  AutoPtrType& pLTDescendant,
+  AutoPtrType& pRTDescendant)
+{
+  pLBDescendant.reset(new DynamicQuadTreeNode<NodeDataType>(this, 0));
+  pRBDescendant.reset(new DynamicQuadTreeNode<NodeDataType>(this, 1));
+  pLTDescendant.reset(new DynamicQuadTreeNode<NodeDataType>(this, 2));
+  pRTDescendant.reset(new DynamicQuadTreeNode<NodeDataType>(this, 3));
 }
 
 template <typename NodeDataType>
