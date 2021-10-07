@@ -47,14 +47,14 @@
 
 #include <vector>
 
-#include "RenderDevice.h"
-#include "DeviceContext.h"
 #include "Buffer.h"
-#include "Texture.h"
 #include "BufferView.h"
-#include "TextureView.h"
+#include "DeviceContext.h"
 #include "GraphicsTypes.h"
 #include "RefCntAutoPtr.hpp"
+#include "RenderDevice.h"
+#include "Texture.h"
+#include "TextureView.h"
 
 #include "AdvancedMath.hpp"
 
@@ -67,111 +67,110 @@ namespace Diligent
 // Structure describing terrain rendering parameters
 struct RenderingParams
 {
-    TerrainAttribs m_TerrainAttribs;
+  TerrainAttribs m_TerrainAttribs;
 
-    enum TEXTURING_MODE
-    {
-        TM_HEIGHT_BASED     = 0,
-        TM_MATERIAL_MASK    = 1,
-        TM_MATERIAL_MASK_NM = 2
-    };
+  enum TEXTURING_MODE
+  {
+    TM_HEIGHT_BASED     = 0,
+    TM_MATERIAL_MASK    = 1,
+    TM_MATERIAL_MASK_NM = 2
+  };
 
-    // Patch rendering params
-    TEXTURING_MODE m_TexturingMode  = TM_MATERIAL_MASK_NM;
-    int            m_iRingDimension = 65; // 4K+1
-    int            m_iNumRings      = 15;
+  // Patch rendering params
+  TEXTURING_MODE m_TexturingMode  = TM_MATERIAL_MASK_NM;
+  int            m_iRingDimension = 65; // 4K+1
+  int            m_iNumRings      = 15;
 
-    int            m_iNumShadowCascades         = 6;
-    int            m_bBestCascadeSearch         = 1;
-    int            m_FixedShadowFilterSize      = 5;
-    bool           m_FilterAcrossShadowCascades = true;
-    int            m_iColOffset                 = 1356;
-    int            m_iRowOffset                 = 924;
-    TEXTURE_FORMAT DstRTVFormat                 = TEX_FORMAT_R11G11B10_FLOAT;
-    TEXTURE_FORMAT ShadowMapFormat              = TEX_FORMAT_D32_FLOAT;
+  int            m_iNumShadowCascades         = 6;
+  int            m_bBestCascadeSearch         = 1;
+  int            m_FixedShadowFilterSize      = 5;
+  bool           m_FilterAcrossShadowCascades = true;
+  int            m_iColOffset                 = 1356;
+  int            m_iRowOffset                 = 924;
+  TEXTURE_FORMAT DstRTVFormat                 = TEX_FORMAT_R11G11B10_FLOAT;
+  TEXTURE_FORMAT ShadowMapFormat              = TEX_FORMAT_D32_FLOAT;
 };
 
 struct RingSectorMesh
 {
-    RefCntAutoPtr<IBuffer> pIndBuff;
-    Uint32                 uiNumIndices;
-    BoundBox               BndBox;
-    RingSectorMesh() :
-        uiNumIndices(0) {}
+  RefCntAutoPtr<IBuffer> pIndBuff;
+  Uint32                 uiNumIndices;
+  BoundBox               BndBox;
+  RingSectorMesh() : uiNumIndices(0) {}
 };
 
 class EarthHemsiphere
 {
 public:
-    EarthHemsiphere(void) :
-        m_ValidShaders(0) {}
+  EarthHemsiphere(void) : m_ValidShaders(0) {}
 
-    // clang-format off
+  // clang-format off
     // 显式的禁用某个函数
     EarthHemsiphere             (const EarthHemsiphere&) = delete; //默认复制构造禁用
     EarthHemsiphere& operator = (const EarthHemsiphere&) = delete; //默认赋值构造禁用
     EarthHemsiphere             (EarthHemsiphere&&)      = delete; //指针复制构造禁用
     EarthHemsiphere& operator = (EarthHemsiphere&&)      = delete; //指针赋值构造禁用
-    // clang-format on
+  // clang-format on
 
-    // Renders the model
-    void Render(IDeviceContext*        pContext,
-                const RenderingParams& NewParams,
-                const float3&          vCameraPosition,
-                const float4x4&        CameraViewProjMatrix,
-                ITextureView*          pShadowMapSRV,
-                ITextureView*          pPrecomputedNetDensitySRV,
-                ITextureView*          pAmbientSkylightSRV,
-                bool                   bZOnlyPass);
+  // Renders the model
 
-    // Creates device resources
-    void Create(class ElevationDataSource* pDataSource,
-                const RenderingParams&     Params,
-                IRenderDevice*             pDevice,
-                IDeviceContext*            pContext,
-                const Char*                MaterialMaskPath,
-                const Char*                TileTexturePath[],
-                const Char*                TileNormalMapPath[],
-                IBuffer*                   pcbCameraAttribs,
-                IBuffer*                   pcbLightAttribs,
-                IBuffer*                   pcMediaScatteringParams);
+  void Render(IDeviceContext*        pContext,
+              const RenderingParams& NewParams,
+              const float3&          vCameraPosition,
+              const float4x4&        CameraViewProjMatrix,
+              ITextureView*          pShadowMapSRV,
+              ITextureView*          pPrecomputedNetDensitySRV,
+              ITextureView*          pAmbientSkylightSRV,
+              bool                   bZOnlyPass);
 
-    enum
-    {
-        NUM_TILE_TEXTURES = 1 + 4
-    }; // One base material + 4 masked materials
+  // Creates device resources
+  void Create(class ElevationDataSource* pDataSource,
+              const RenderingParams&     Params,
+              IRenderDevice*             pDevice,
+              IDeviceContext*            pContext,
+              const Char*                MaterialMaskPath,
+              const Char*                TileTexturePath[],
+              const Char*                TileNormalMapPath[],
+              IBuffer*                   pcbCameraAttribs,
+              IBuffer*                   pcbLightAttribs,
+              IBuffer*                   pcMediaScatteringParams);
+
+  enum
+  {
+    NUM_TILE_TEXTURES = 1 + 4
+  }; // One base material + 4 masked materials
 
 private:
-    void RenderNormalMap(IRenderDevice*  pd3dDevice,
-                         IDeviceContext* pd3dImmediateContext,
-                         const Uint16*   pHeightMap,
-                         size_t          HeightMapPitch,
-                         size_t          HeightMapDim,
-                         ITexture*       ptex2DNormalMap);
+  void RenderNormalMap(IRenderDevice*  pd3dDevice,
+                       IDeviceContext* pd3dImmediateContext,
+                       const Uint16*   pHeightMap,
+                       size_t          HeightMapPitch,
+                       size_t          HeightMapDim,
+                       ITexture*       ptex2DNormalMap);
 
-    RenderingParams m_Params;
+  RenderingParams m_Params;
 
-    RefCntAutoPtr<IRenderDevice> m_pDevice;
+  RefCntAutoPtr<IRenderDevice> m_pDevice;
 
-    RefCntAutoPtr<IBuffer>      m_pcbTerrainAttribs;
-    RefCntAutoPtr<IBuffer>      m_pVertBuff;
-    RefCntAutoPtr<ITextureView> m_ptex2DNormalMapSRV, m_ptex2DMtrlMaskSRV;
+  RefCntAutoPtr<IBuffer>      m_pcbTerrainAttribs;
+  RefCntAutoPtr<IBuffer>      m_pVertBuff;
+  RefCntAutoPtr<ITextureView> m_ptex2DNormalMapSRV, m_ptex2DMtrlMaskSRV;
 
-    RefCntAutoPtr<ITextureView> m_ptex2DTilesSRV[NUM_TILE_TEXTURES];
-    RefCntAutoPtr<ITextureView> m_ptex2DTilNormalMapsSRV[NUM_TILE_TEXTURES];
+  RefCntAutoPtr<ITextureView> m_ptex2DTilesSRV[NUM_TILE_TEXTURES];
+  RefCntAutoPtr<ITextureView> m_ptex2DTilNormalMapsSRV[NUM_TILE_TEXTURES];
 
-    RefCntAutoPtr<IResourceMapping> m_pResMapping;
-    RefCntAutoPtr<IShader>          m_pHemisphereVS;
+  RefCntAutoPtr<IResourceMapping> m_pResMapping;
+  RefCntAutoPtr<IShader>          m_pHemisphereVS;
 
-    RefCntAutoPtr<IPipelineState>         m_pHemisphereZOnlyPSO;
-    RefCntAutoPtr<IShaderResourceBinding> m_pHemisphereZOnlySRB;
-    RefCntAutoPtr<IPipelineState>         m_pHemispherePSO;
-    RefCntAutoPtr<IShaderResourceBinding> m_pHemisphereSRB;
-    RefCntAutoPtr<ISampler>               m_pComparisonSampler;
+  RefCntAutoPtr<IPipelineState>         m_pHemisphereZOnlyPSO;
+  RefCntAutoPtr<IShaderResourceBinding> m_pHemisphereZOnlySRB;
+  RefCntAutoPtr<IPipelineState>         m_pHemispherePSO;
+  RefCntAutoPtr<IShaderResourceBinding> m_pHemisphereSRB;
+  RefCntAutoPtr<ISampler>               m_pComparisonSampler;
 
-    std::vector<RingSectorMesh> m_SphereMeshes;
+  std::vector<RingSectorMesh> m_SphereMeshes;
 
-    Uint32 m_ValidShaders;
+  Uint32 m_ValidShaders;
 };
 
 } // namespace Diligent
