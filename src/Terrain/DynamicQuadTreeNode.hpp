@@ -45,32 +45,29 @@
 
 #pragma once
 
-#include <memory>
 #include <cassert>
+#include <memory>
 
 namespace Diligent
 {
 
 // Structure describing quad tree node location
-struct QuadTreeNodeLocation
+struct QuadTreeNodePosition
 {
-    // Position in a tree
-    int horzOrder;
-    int vertOrder;
-    int level;
+  // Position in a tree
+  int horz_order;
+  int vert_order;
+  int level;
 
-    QuadTreeNodeLocation(int h, int v, int l) :
-        horzOrder(h), vertOrder(v), level(l)
-    {
-        VERIFY_EXPR(h < (1 << l)); // h< 2^l
-        VERIFY_EXPR(v < (1 << l)); // v< 2^l
-    }
-    QuadTreeNodeLocation() :
-        horzOrder(0), vertOrder(0), level(0)
-    {}
+  QuadTreeNodePosition(int h, int v, int l) : horz_order(h), vert_order(v), level(l)
+  {
+    VERIFY_EXPR(h < (1 << l)); // h< 2^l
+    VERIFY_EXPR(v < (1 << l)); // v< 2^l
+  }
+  QuadTreeNodePosition() : horz_order(0), vert_order(0), level(0) {}
 
-    // Gets location of a child
-    /*
+  // Gets position of a child
+  /*
     -----------------
     |       |       |
     |   2   |   3   |
@@ -81,86 +78,79 @@ struct QuadTreeNodeLocation
     |       |       |
     -----------------
     */
-    inline friend QuadTreeNodeLocation GetChildLocation(const QuadTreeNodeLocation& parent,
-                                                        unsigned int                siblingOrder)
-    {
-        VERIFY_EXPR(siblingOrder >= 0 && siblingOrder < 4);
-        return QuadTreeNodeLocation(parent.horzOrder * 2 + (siblingOrder & 1),
-                                    parent.vertOrder * 2 + (siblingOrder >> 1),
-                                    parent.level + 1);
-    }
+  inline friend QuadTreeNodePosition GetChildPosition(const QuadTreeNodePosition& parent, unsigned int birth_order)
+  {
+    VERIFY_EXPR(birth_order >= 0 && birth_order < 4);
+    return QuadTreeNodePosition(parent.horz_order * 2 + (birth_order & 1), parent.vert_order * 2 + (birth_order >> 1), parent.level + 1);
+  }
 
-    // Gets location of a parent
-    inline friend QuadTreeNodeLocation GetParentLocation(const QuadTreeNodeLocation& node)
-    {
-        assert(node.level > 0);
-        return QuadTreeNodeLocation(node.horzOrder / 2, node.vertOrder / 2, node.level - 1);
-    }
+  // Gets location of a parent
+  inline friend QuadTreeNodePosition GetParentLocation(const QuadTreeNodePosition& node)
+  {
+    assert(node.level > 0);
+    return QuadTreeNodePosition(node.horz_order / 2, node.vert_order / 2, node.level - 1);
+  }
 };
 
 // Base class for iterators traversing the quad tree
 class HierarchyIteratorBase
 {
 public:
-    operator const QuadTreeNodeLocation&() const { return m_current; }
-    int Level() const { return m_current.level; }
-    int Horz() const { return m_current.horzOrder; }
-    int Vert() const { return m_current.vertOrder; }
+      operator const QuadTreeNodePosition&() const { return now_; }
+  int Level() const { return now_.level; }
+  int Horz() const { return now_.horz_order; }
+  int Vert() const { return now_.vert_order; }
 
 protected:
-    QuadTreeNodeLocation m_current;
-    int                  m_currentLevelSize;
+  QuadTreeNodePosition now_;
+  int                  now_level_size_{1};
 };
 
 // Iterator for recursively traversing the quad tree starting from the root up to the specified level
 class HierarchyIterator : public HierarchyIteratorBase
 {
 public:
-    HierarchyIterator(int nLevels) :
-        m_nLevels(nLevels)
+  HierarchyIterator(int num_levels) : num_levels_(num_levels) {}
+  bool IsValid() const { return now_.level < num_levels_; }
+  void Next()
+  {
+    if (++now_.horz_order == now_level_size_)
     {
-        m_currentLevelSize = 1;
+      now_.horz_order = 0;
+      if (++now_.vert_order == now_level_size_)
+      {
+        now_.vert_order = 0;
+        now_level_size_ = 1 << ++now_.level;
+      }
     }
-    bool IsValid() const { return m_current.level < m_nLevels; }
-    void Next()
-    {
-        if (++m_current.horzOrder == m_currentLevelSize)
-        {
-            m_current.horzOrder = 0;
-            if (++m_current.vertOrder == m_currentLevelSize)
-            {
-                m_current.vertOrder = 0;
-                m_currentLevelSize  = 1 << ++m_current.level;
-            }
-        }
-    }
+  }
 
 private:
-    int m_nLevels;
+  int num_levels_;
 };
 
 // Iterator for recursively traversing the quad tree starting from the specified level up to the root
 class HierarchyReverseIterator : public HierarchyIteratorBase
 {
 public:
-    HierarchyReverseIterator(int nLevels)
+  HierarchyReverseIterator(int num_levels)
+  {
+    now_.level      = num_levels - 1;
+    now_level_size_ = 1 << now_.level;
+  }
+  bool IsValid() const { return now_.level >= 0; }
+  void Next()
+  {
+    if (++now_.horz_order == now_level_size_)
     {
-        m_current.level    = nLevels - 1;
-        m_currentLevelSize = 1 << m_current.level;
+      now_.horz_order = 0;
+      if (++now_.vert_order == now_level_size_)
+      {
+        now_.vert_order = 0;
+        now_level_size_ = 1 << --now_.level;
+      }
     }
-    bool IsValid() const { return m_current.level >= 0; }
-    void Next()
-    {
-        if (++m_current.horzOrder == m_currentLevelSize)
-        {
-            m_current.horzOrder = 0;
-            if (++m_current.vertOrder == m_currentLevelSize)
-            {
-                m_current.vertOrder = 0;
-                m_currentLevelSize  = 1 << --m_current.level;
-            }
-        }
-    }
+  }
 };
 
 // Template class for the node of a dynamic quad tree
@@ -168,117 +158,92 @@ template <typename NodeDataType>
 class DynamicQuadTreeNode
 {
 public:
-    DynamicQuadTreeNode() :
-        m_pAncestor(NULL)
-    {
-    }
+  typedef DynamicQuadTreeNode*                 RawPtr;
+  typedef std::unique_ptr<DynamicQuadTreeNode> UniPtr;
 
-    NodeDataType&       GetData() { return m_Data; }
-    const NodeDataType& GetData() const { return m_Data; }
+  DynamicQuadTreeNode() : parent_(NULL) {}
 
-    DynamicQuadTreeNode* GetAncestor() const { return m_pAncestor; }
+  NodeDataType&       GetData() { return data_; }
+  const NodeDataType& GetData() const { return data_; }
 
-    void GetDescendants(const DynamicQuadTreeNode*& LBDescendant,
-                        const DynamicQuadTreeNode*& RBDescendant,
-                        const DynamicQuadTreeNode*& LTDescendant,
-                        const DynamicQuadTreeNode*& RTDescendant) const
-    {
-        LBDescendant = m_pLBDescendant.get();
-        RBDescendant = m_pRBDescendant.get();
-        LTDescendant = m_pLTDescendant.get();
-        RTDescendant = m_pRTDescendant.get();
-    }
+  RawPtr GetParent() const { return parent_; }
 
-    void GetDescendants(DynamicQuadTreeNode*& LBDescendant,
-                        DynamicQuadTreeNode*& RBDescendant,
-                        DynamicQuadTreeNode*& LTDescendant,
-                        DynamicQuadTreeNode*& RTDescendant)
-    {
-        LBDescendant = m_pLBDescendant.get();
-        RBDescendant = m_pRBDescendant.get();
-        LTDescendant = m_pLTDescendant.get();
-        RTDescendant = m_pRTDescendant.get();
-    }
+  void GetChildren(const RawPtr& lb_child, const RawPtr& rb_child, const RawPtr& lt_child, const RawPtr& rt_child) const
+  {
+    lb_child = lb_child_.get();
+    rb_child = rb_child_.get();
+    lt_child = lt_child_.get();
+    rt_child = rt_child_.get();
+  }
 
-    typedef std::unique_ptr<DynamicQuadTreeNode<NodeDataType>> AutoPtrType;
-    // Attahes specified descendants to the tree
-    void CreateDescendants(AutoPtrType pLBDescendant,
-                           AutoPtrType pRBDescendant,
-                           AutoPtrType pLTDescendant,
-                           AutoPtrType pRTDescendant);
-    // Creates descendants UNATTACHED to the tree
-    void CreateFloatingDescendants(AutoPtrType& pLBDescendant,
-                                   AutoPtrType& pRBDescendant,
-                                   AutoPtrType& pLTDescendant,
-                                   AutoPtrType& pRTDescendant);
-    // Destroys ALL descendants for the node
-    void DestroyDescendants();
+  void GetChildren(RawPtr& lb_child, RawPtr& rb_child, RawPtr& lt_child, RawPtr& rt_child)
+  {
+    lb_child = lb_child_.get();
+    rb_child = rb_child_.get();
+    lt_child = lt_child_.get();
+    rt_child = rt_child_.get();
+  }
 
-    const QuadTreeNodeLocation& GetPos() const { return m_pos; }
+  // Attahes specified children to the tree
+  void CreateChildren(UniPtr lb_child, UniPtr rb_child, UniPtr lt_child, UniPtr rt_child);
+  // Creates children UN-ATTACHED to the tree
+  void CreateFloatingChildren(UniPtr& lb_child, UniPtr& rb_child, UniPtr& lt_child, UniPtr& rt_child);
+  // Destroys ALL children for the node
+  void DestroyChildren();
 
-    void SetPos(const QuadTreeNodeLocation& pos) { m_pos = pos; }
+  const QuadTreeNodePosition& GetPos() const { return pos_; }
+
+  void SetPos(const QuadTreeNodePosition& pos) { pos_ = pos; }
 
 private:
-    DynamicQuadTreeNode(DynamicQuadTreeNode* pAncestor, int iSiblingOrder) :
-        m_pAncestor(pAncestor),
-        m_pos(GetChildLocation(pAncestor->m_pos, iSiblingOrder))
-    {
-    }
+  DynamicQuadTreeNode(RawPtr parent, int birth_order) : parent_(parent), pos_(GetChildPosition(parent->pos_, birth_order)) {}
 
-    NodeDataType m_Data;
+  NodeDataType data_;
 
-    std::unique_ptr<DynamicQuadTreeNode> m_pLBDescendant;
-    std::unique_ptr<DynamicQuadTreeNode> m_pRBDescendant;
-    std::unique_ptr<DynamicQuadTreeNode> m_pLTDescendant;
-    std::unique_ptr<DynamicQuadTreeNode> m_pRTDescendant;
-    DynamicQuadTreeNode*                 m_pAncestor;
+  UniPtr lb_child_;
+  UniPtr rb_child_;
+  UniPtr lt_child_;
+  UniPtr rt_child_;
+  RawPtr parent_;
 
-    QuadTreeNodeLocation m_pos;
+  QuadTreeNodePosition pos_;
 };
 
-
-
 template <typename NodeDataType>
-void DynamicQuadTreeNode<NodeDataType>::CreateDescendants(AutoPtrType pLBDescendant,
-                                                          AutoPtrType pRBDescendant,
-                                                          AutoPtrType pLTDescendant,
-                                                          AutoPtrType pRTDescendant)
+void DynamicQuadTreeNode<NodeDataType>::CreateChildren(UniPtr lb_child, UniPtr rb_child, UniPtr lt_child, UniPtr rt_child)
 {
-    assert(!m_pLBDescendant.get());
-    assert(!m_pRBDescendant.get());
-    assert(!m_pLTDescendant.get());
-    assert(!m_pRTDescendant.get());
+  assert(!lb_child_.get());
+  assert(!rb_child_.get());
+  assert(!lt_child_.get());
+  assert(!rt_child_.get());
 
-    m_pLBDescendant = pLBDescendant;
-    m_pRBDescendant = pRBDescendant;
-    m_pLTDescendant = pLTDescendant;
-    m_pRTDescendant = pRTDescendant;
+  lb_child_ = lb_child;
+  rb_child_ = rb_child;
+  lt_child_ = lt_child;
+  rt_child_ = rt_child;
 }
 
 template <typename NodeDataType>
-void DynamicQuadTreeNode<NodeDataType>::CreateFloatingDescendants(AutoPtrType& pLBDescendant,
-  AutoPtrType& pRBDescendant,
-  AutoPtrType& pLTDescendant,
-  AutoPtrType& pRTDescendant)
+void DynamicQuadTreeNode<NodeDataType>::CreateFloatingChildren(UniPtr& lb_child, UniPtr& rb_child, UniPtr& lt_child, UniPtr& rt_child)
 {
-  pLBDescendant.reset(new DynamicQuadTreeNode<NodeDataType>(this, 0));
-  pRBDescendant.reset(new DynamicQuadTreeNode<NodeDataType>(this, 1));
-  pLTDescendant.reset(new DynamicQuadTreeNode<NodeDataType>(this, 2));
-  pRTDescendant.reset(new DynamicQuadTreeNode<NodeDataType>(this, 3));
+  lb_child.reset(new DynamicQuadTreeNode(this, 0));
+  rb_child.reset(new DynamicQuadTreeNode(this, 1));
+  lt_child.reset(new DynamicQuadTreeNode(this, 2));
+  rt_child.reset(new DynamicQuadTreeNode(this, 3));
 }
 
 template <typename NodeDataType>
-void DynamicQuadTreeNode<NodeDataType>::DestroyDescendants()
+void DynamicQuadTreeNode<NodeDataType>::DestroyChildren()
 {
-    if (m_pLBDescendant.get()) m_pLBDescendant->DestroyDescendants();
-    if (m_pRBDescendant.get()) m_pRBDescendant->DestroyDescendants();
-    if (m_pLTDescendant.get()) m_pLTDescendant->DestroyDescendants();
-    if (m_pRTDescendant.get()) m_pRTDescendant->DestroyDescendants();
+  if (lb_child_.get()) lb_child_->DestroyChildren();
+  if (rb_child_.get()) rb_child_->DestroyChildren();
+  if (lt_child_.get()) lt_child_->DestroyChildren();
+  if (rt_child_.get()) rt_child_->DestroyChildren();
 
-    m_pLBDescendant.reset();
-    m_pRBDescendant.reset();
-    m_pLTDescendant.reset();
-    m_pRTDescendant.reset();
+  lb_child_.reset();
+  rb_child_.reset();
+  lt_child_.reset();
+  rt_child_.reset();
 }
 
 } // namespace Diligent

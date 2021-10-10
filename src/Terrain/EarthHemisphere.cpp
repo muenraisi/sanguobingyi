@@ -76,42 +76,47 @@ namespace Diligent
 struct HemisphereVertex
 {
   float3 world_pos;
-  float2 mask_uv;
+  float2 mask_uv; // mask coord for normal map?
   HemisphereVertex() : world_pos(0, 0, 0), mask_uv(0, 0) {}
 };
 
-template <typename E> constexpr auto to_underlying(E e) noexcept { return static_cast<std::underlying_type_t<E>>(e); }
+template <typename E>
+constexpr auto to_underlying(E e) noexcept
+{
+  return static_cast<std::underlying_type_t<E>>(e);
+}
 
-enum class QUAD_TRI_TYPE : size_t
+enum class QUAD_TRI_TYPE : Uint8
 {
   UNDEFINED = 2,
-  // 01      11
+  // 01      11 (row 1)
   //  *------*
   //  |   .' |
   //  | .'   |
   //  * -----*
-  // 00(1)  10
-  DIAG_00_11 = 1, // where frist index is 1
-  // 01      11
+  // 00     10  (row 0)
+  DIAG_00_11 = 1, // where frist index is in row 1
+  // 01      11 (row 1)
   //  *------*
   //  | '.   |
   //  |   '. |
   //  * -----*
-  // 00(0)   10
-  DIAG_01_10 = 0, // where frist index is 0
+  // 00      10 (row 0)
+  DIAG_01_10 = 0, // where frist index is in row 0
 };
 
-template <typename IndexType, class IndexGenerator> class TriStrip
+template <typename IndexType, template <typename> class IndexGenerator>
+class TriStrip
 {
 public:
-  TriStrip(std::vector<IndexType>& indices, IndexGenerator index_generator) :
+  TriStrip(std::vector<IndexType>& indices, IndexGenerator<IndexType> index_generator) :
     quad_tri_type_(QUAD_TRI_TYPE::UNDEFINED), indices_(indices), index_generator_(index_generator)
   {}
 
   void AddStrip(IndexType base_index, IndexType init_col, IndexType init_row, IndexType num_cols, IndexType num_rows, QUAD_TRI_TYPE quad_tri_type)
   {
     VERIFY_EXPR(quad_tri_type == QUAD_TRI_TYPE::DIAG_00_11 || quad_tri_type == QUAD_TRI_TYPE::DIAG_01_10);
-    IndexType first_index = base_index + index_generator_(init_col, init_row + to_underlying(quad_tri_type));
+    IndexType first_index = base_index + index_generator_(init_col, init_row + static_cast<IndexType>(quad_tri_type));
     if (quad_tri_type_ != QUAD_TRI_TYPE::UNDEFINED)
     {
       // To move from one strip to another, we have to generate two degenerate triangles by duplicating the last vertex in previous strip
@@ -129,35 +134,35 @@ public:
     }
     quad_tri_type_ = quad_tri_type;
 
-    for (int row = 0; row < num_rows - 1; ++row)
+    for (IndexType row = 0; row < num_rows - 1; ++row)
     {
-      for (int col = 0; col < num_cols; ++col)
+      for (IndexType col = 0; col < num_cols; ++col)
       {
-        int iV00 = base_index + index_generator_(init_col + col, init_row + row);
-        int iV01 = base_index + index_generator_(init_col + col, init_row + row + 1);
+        IndexType v00 = base_index + index_generator_(init_col + col, init_row + row);
+        IndexType v01 = base_index + index_generator_(init_col + col, init_row + row + 1);
         if (quad_tri_type_ == QUAD_TRI_TYPE::DIAG_01_10)
         {
-          if (col == 0 && row == 0) VERIFY_EXPR(first_index == iV00);
+          if (col == 0 && row == 0) VERIFY_EXPR(first_index == v00);
           // 01      11
           //  *------*
           //  | '.   |
           //  |   '. |
           //  * -----*
           // 00      10
-          indices_.push_back(iV00);
-          indices_.push_back(iV01);
+          indices_.push_back(v00);
+          indices_.push_back(v01);
         }
         else if (quad_tri_type_ == QUAD_TRI_TYPE::DIAG_00_11)
         {
-          if (col == 0 && row == 0) VERIFY_EXPR(first_index == iV01);
+          if (col == 0 && row == 0) VERIFY_EXPR(first_index == v01);
           // 01      11
           //  *------*
           //  |   .' |
           //  | .'   |
           //  * -----*
           // 00      10
-          indices_.push_back(iV01);
-          indices_.push_back(iV00);
+          indices_.push_back(v01);
+          indices_.push_back(v00);
         }
         else
         {
@@ -168,45 +173,46 @@ public:
       if (row < num_rows - 2)
       {
         indices_.push_back(indices_.back());
-        indices_.push_back(base_index + index_generator_(init_col, init_row + row + 1 + to_underlying(quad_tri_type)));
+        indices_.push_back(base_index + index_generator_(init_col, init_row + row + static_cast<IndexType>(quad_tri_type)) + 1);
       }
     }
   }
 
 private:
-  QUAD_TRI_TYPE           quad_tri_type_;
-  std::vector<IndexType>& indices_;
-  IndexGenerator          index_generator_;
+  QUAD_TRI_TYPE             quad_tri_type_;
+  std::vector<IndexType>&   indices_;
+  IndexGenerator<IndexType> index_generator_;
 };
 
+template <typename IndexType>
 class StdIndexGenerator
 {
 public:
-  StdIndexGenerator(int interval) : interaval_(interval) {}
+  StdIndexGenerator(IndexType interval) : interaval_(interval) {}
 
-  size_t operator()(size_t col, size_t row, size_t init = 0) { return col + row * interaval_ + init; }
+  IndexType operator()(IndexType col, IndexType row, IndexType init = 0) { return col + row * interaval_ + init; }
 
 private:
-  int interaval_;
+  IndexType interaval_;
 };
 
 typedef TriStrip<Uint32, StdIndexGenerator> StdTriStrip32;
 
-void ComputeVertexHeight(HemisphereVertex& vertex, class ElevationDataSource* elevation_data_source, float sampling_step, float sample_scale)
+void ComputeVertexHeight(HemisphereVertex& vertex, class ElevationDataSource* elev_data_src, float sampling_step, float height_scale)
 {
   float3& world_pos = vertex.world_pos;
 
-  float hm_col     = world_pos.x / sampling_step; // col of height map
+  float hm_col     = world_pos.x / sampling_step; // sampling_step is the size by which the height map repeat
   float hm_row     = world_pos.z / sampling_step;
-  float displation = elevation_data_source->GetInterpolatedHeight(hm_col, hm_row);
+  float altitude = elev_data_src->GetInterpolateHeight(hm_col, hm_row);
   int   col_offset, row_offset;
-  elevation_data_source->GetOffsets(col_offset, row_offset);
-  // +0.5f due to translate to orign
-  vertex.mask_uv.x = (hm_col + static_cast<float>(col_offset) + 0.5f) / static_cast<float>(elevation_data_source->GetNumCols());
-  vertex.mask_uv.y = (hm_row + static_cast<float>(row_offset) + 0.5f) / static_cast<float>(elevation_data_source->GetNumRows());
+  elev_data_src->GetOffsets(col_offset, row_offset);
+  // +0.5f due to translate to orign£¿
+  vertex.mask_uv.x = (hm_col + static_cast<float>(col_offset) + 0.5f) / static_cast<float>(elev_data_src->GetDimCol());
+  vertex.mask_uv.y = (hm_row + static_cast<float>(row_offset) + 0.5f) / static_cast<float>(elev_data_src->GetDimRow());
 
-  float3 f3SphereNormal = normalize(world_pos);
-  world_pos += f3SphereNormal * displation * sample_scale;
+  float3 sphere_normal = normalize(world_pos);
+  world_pos += sphere_normal * altitude * height_scale;
 }
 
 class RingMeshBuilder
@@ -222,7 +228,7 @@ public:
     auto& CurrMesh = m_RingMeshes.back();
 
     std::vector<Uint32> IB;
-    StdTriStrip32       TriStrip(IB, StdIndexGenerator(m_iGridDimenion));
+    StdTriStrip32       TriStrip(IB, StdIndexGenerator<Uint32>(m_iGridDimenion));
     TriStrip.AddStrip(iBaseIndex, iStartCol, iStartRow, iNumCols, iNumRows, QuadTriangType);
 
     CurrMesh.uiNumIndices = (Uint32)IB.size();
@@ -266,7 +272,7 @@ void GenerateSphereGeometry(IRenderDevice*                 pDevice,
                             const size_t                   num_rings,
                             class ElevationDataSource*     elevation_data_source,
                             float                          sampling_step,
-                            float                          sample_scale,
+                            float                          height_scale,
                             std::vector<HemisphereVertex>& vert_buff,
                             std::vector<RingSectorMesh>&   sphere_meshes)
 {
@@ -277,9 +283,9 @@ void GenerateSphereGeometry(IRenderDevice*                 pDevice,
                grid_dim); // Grid dimension of projection sphere, due to
                           // symmetry, it should be 2K+1, but why 4K+1
   }
-  const size_t      grid_midst = (grid_dim - 1) / 2;
-  const size_t      grid_quart = (grid_dim - 1) / 4;
-  StdIndexGenerator std_index_generator(grid_dim);
+  const size_t              grid_midst = (grid_dim - 1) / 2;
+  const size_t              grid_quart = (grid_dim - 1) / 4;
+  StdIndexGenerator<Uint32> std_index_generator(grid_dim);
 
   // const int iLargestGridScale = iGridDimension << (iNumRings-1);
 
@@ -327,7 +333,7 @@ void GenerateSphereGeometry(IRenderDevice*                 pDevice,
         pos.z *= earth_radius;
         pos.y *= earth_radius;
 
-        ComputeVertexHeight(now_vert, elevation_data_source, sampling_step, sample_scale);
+        ComputeVertexHeight(now_vert, elevation_data_source, sampling_step, height_scale);
         pos.y -= earth_radius; // Translate the top to the origin
       }
 
@@ -637,8 +643,8 @@ void EarthHemsiphere::Create(class ElevationDataSource* pDataSource,
   const Uint16* pHeightMap;
   size_t        HeightMapPitch;
   pDataSource->GetDataPtr(pHeightMap, HeightMapPitch);
-  Uint32 iHeightMapDim = pDataSource->GetNumCols();
-  VERIFY_EXPR(iHeightMapDim == pDataSource->GetNumRows());
+  Uint32 iHeightMapDim = pDataSource->GetDimCol();
+  VERIFY_EXPR(iHeightMapDim == pDataSource->GetDimRow());
 
   TextureDesc NormalMapDesc;
   NormalMapDesc.Name      = "Normal map texture";
@@ -861,18 +867,15 @@ void EarthHemsiphere::Render(IDeviceContext*        pContext,
 
     PSODesc.Name = "RenderHemisphere";
 
-    // clang-format off
-        ShaderResourceVariableDesc Vars[] = 
-        {
-			{SHADER_TYPE_VERTEX, "cbCameraAttribs",                      SHADER_RESOURCE_VARIABLE_TYPE_MUTABLE}, 
-			{SHADER_TYPE_VERTEX, "cbLightAttribs",                       SHADER_RESOURCE_VARIABLE_TYPE_MUTABLE}, 
-			{SHADER_TYPE_VERTEX, "cbTerrainAttribs",                     SHADER_RESOURCE_VARIABLE_TYPE_MUTABLE},
-			{SHADER_TYPE_VERTEX, "cbParticipatingMediaScatteringParams", SHADER_RESOURCE_VARIABLE_TYPE_STATIC},
-			{SHADER_TYPE_VERTEX, "g_tex2DOccludedNetDensityToAtmTop",    SHADER_RESOURCE_VARIABLE_TYPE_DYNAMIC},
-			{SHADER_TYPE_VERTEX, "g_tex2DAmbientSkylight",               SHADER_RESOURCE_VARIABLE_TYPE_DYNAMIC} ,
-            {SHADER_TYPE_PIXEL,  "g_tex2DShadowMap",                     SHADER_RESOURCE_VARIABLE_TYPE_DYNAMIC},
-        };
-    // clang-format on
+    ShaderResourceVariableDesc Vars[] = {
+      {SHADER_TYPE_VERTEX, "cbCameraAttribs", SHADER_RESOURCE_VARIABLE_TYPE_MUTABLE},
+      {SHADER_TYPE_VERTEX, "cbLightAttribs", SHADER_RESOURCE_VARIABLE_TYPE_MUTABLE},
+      {SHADER_TYPE_VERTEX, "cbTerrainAttribs", SHADER_RESOURCE_VARIABLE_TYPE_MUTABLE},
+      {SHADER_TYPE_VERTEX, "cbParticipatingMediaScatteringParams", SHADER_RESOURCE_VARIABLE_TYPE_STATIC},
+      {SHADER_TYPE_VERTEX, "g_tex2DOccludedNetDensityToAtmTop", SHADER_RESOURCE_VARIABLE_TYPE_DYNAMIC},
+      {SHADER_TYPE_VERTEX, "g_tex2DAmbientSkylight", SHADER_RESOURCE_VARIABLE_TYPE_DYNAMIC},
+      {SHADER_TYPE_PIXEL, "g_tex2DShadowMap", SHADER_RESOURCE_VARIABLE_TYPE_DYNAMIC},
+    };
     PSODesc.ResourceLayout.Variables            = Vars;
     PSODesc.ResourceLayout.NumVariables         = _countof(Vars);
     PSODesc.ResourceLayout.ImmutableSamplers    = ImtblSamplers.data();

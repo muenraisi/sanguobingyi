@@ -117,7 +117,7 @@ AlwaysBreakAfterDefinitionReturnType: None
 
 AlwaysBreakAfterReturnType: None
 AlwaysBreakBeforeMultilineStrings: false
-AlwaysBreakTemplateDeclarations: No
+AlwaysBreakTemplateDeclarations: Yes
 
 # If false, a function call's arguments will either be all on the same line or will have one line each.
 BinPackArguments: true
@@ -356,7 +356,7 @@ MacroBlockBegin: ''
 MacroBlockEnd:   ''
 
 # The maximum number of consecutive empty lines to keep.
-MaxEmptyLinesToKeep: 10000
+MaxEmptyLinesToKeep: 1
 
 # The indentation used for namespaces.
 NamespaceIndentation: None

@@ -582,7 +582,7 @@ void AtmosphereSample::Render()
 
   RenderShadowMap(m_pImmediateContext, LightAttrs, m_mCameraView, m_mCameraProj);
 
-  LightAttrs.ShadowAttribs.bVisualizeCascades = m_ShadowSettings.bVisualizeCascades ? TRUE : FALSE;
+  LightAttrs.ShadowAttribs.bVisualizeCascades = m_ShadowSettings.bVisualizeCascades;
 
   {
     MapHelper<LightAttribs> LightAttribsCBData(m_pImmediateContext, m_pcbLightAttribs, MAP_WRITE, MAP_FLAG_DISCARD);
