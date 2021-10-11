@@ -40,74 +40,76 @@ namespace Diligent
 class AtmosphereSample final : public SampleBase
 {
 public:
-  AtmosphereSample();
-  ~AtmosphereSample();
+    AtmosphereSample();
+    ~AtmosphereSample();
 
-  virtual void ModifyEngineInitInfo(const ModifyEngineInitInfoAttribs& Attribs) override final;
+    virtual void ModifyEngineInitInfo(const ModifyEngineInitInfoAttribs& Attribs) override final;
 
-  virtual void Initialize(const SampleInitInfo& InitInfo) override final;
-  virtual void Render() override final;
-  virtual void Update(double CurrTime, double ElapsedTime) override final;
-  virtual void WindowResize(Uint32 Width, Uint32 Height) override final;
+    virtual void Initialize(const SampleInitInfo& InitInfo) override final;
+    virtual void Render() override final;
+    virtual void Update(double CurrTime, double ElapsedTime) override final;
+    virtual void WindowResize(Uint32 Width, Uint32 Height) override final;
 
-  virtual const Char* GetSampleName() const override final { return "Atmosphere Sample"; }
+    virtual const Char* GetSampleName() const override final { return "Atmosphere Sample"; }
 
 private:
-  void UpdateUI();
-  void CreateShadowMap();
-  void RenderShadowMap(IDeviceContext* pContext, LightAttribs& LightAttribs, const float4x4& mCameraView,
-                       const float4x4& mCameraProj);
+    void UpdateUI();
+    void CreateShadowMap();
+    void RenderShadowMap(IDeviceContext* pContext,
+                         LightAttribs&   LightAttribs,
+                         const float4x4& mCameraView,
+                         const float4x4& mCameraProj);
 
-  float3 m_f3LightDir = {-0.554699242f, -0.0599640049f, -0.829887390f};
+    float3 m_f3LightDir = {-0.554699242f, -0.0599640049f, -0.829887390f};
 
-  Quaternion m_CameraRotation = {0, 0, 0, 1};
-  float3     m_f3CameraPos    = {0, 8000.f, 0};
-  float4x4   m_mCameraView;
-  float4x4   m_mCameraProj;
+    Quaternion m_CameraRotation = {0, 0, 0, 1};
+    float3     m_f3CameraPos    = {0, 8000.f, 0};
+    float4x4   m_mCameraView;
+    float4x4   m_mCameraProj;
 
-  RefCntAutoPtr<IBuffer> m_pcbCameraAttribs;
-  RefCntAutoPtr<IBuffer> m_pcbLightAttribs;
+    RefCntAutoPtr<IBuffer> m_pcbCameraAttribs;
+    RefCntAutoPtr<IBuffer> m_pcbLightAttribs;
 
-  ShadowMapManager m_ShadowMapMgr;
-  struct ShadowSettings
-  {
-    Uint32 Resolution                 = 1024;
-    float  fCascadePartitioningFactor = 0.95f;
-    bool   bVisualizeCascades         = false;
-    int    iFixedFilterSize           = 5;
-  } m_ShadowSettings;
+    ShadowMapManager m_ShadowMapMgr;
+    struct ShadowSettings
+    {
+        Uint32 Resolution                 = 1024;
+        float  fCascadePartitioningFactor = 0.95f;
+        bool   bVisualizeCascades         = false;
+        int    iFixedFilterSize           = 5;
+    } m_ShadowSettings;
 
-  RefCntAutoPtr<ISampler> m_pComparisonSampler;
+    RefCntAutoPtr<ISampler> m_pComparisonSampler;
 
-  RenderingParams                m_TerrainRenderParams;
-  EpipolarLightScatteringAttribs m_PPAttribs;
+    RenderingParams                m_TerrainRenderParams;
+    EpipolarLightScatteringAttribs m_PPAttribs;
 
-  String m_strRawDEMDataFile;
-  String m_strMtrlMaskFile;
-  String m_strTileTexPaths[EarthHemsiphere::NUM_TILE_TEXTURES];
-  String m_strNormalMapTexPaths[EarthHemsiphere::NUM_TILE_TEXTURES];
+    String m_strRawDEMDataFile;
+    String m_strMtrlMaskFile;
+    String m_strTileTexPaths[EarthHemsiphere::NUM_TILE_TEXTURES];
+    String m_strNormalMapTexPaths[EarthHemsiphere::NUM_TILE_TEXTURES];
 
-  float m_fMinElevation = 0, m_fMaxElevation = 0;
+    float m_fMinElevation = 0, m_fMaxElevation = 0;
 
-  std::unique_ptr<ElevationDataSource> m_pElevDataSource;
-  EarthHemsiphere                      m_EarthHemisphere;
-  bool                                 m_bIsGLDevice = false;
+    std::unique_ptr<ElevationDataSource> m_pElevDataSource;
+    EarthHemsiphere                      m_EarthHemisphere;
+    bool                                 m_bIsGLDevice = false;
 
-  std::unique_ptr<EpipolarLightScattering> m_pLightSctrPP;
+    std::unique_ptr<EpipolarLightScattering> m_pLightSctrPP;
 
-  bool   m_bEnableLightScattering = true;
-  float  m_fElapsedTime           = 0.f;
-  float3 m_f3CustomRlghBeta, m_f3CustomMieBeta, m_f3CustomOzoneAbsoprtion;
+    bool   m_bEnableLightScattering = true;
+    float  m_fElapsedTime           = 0.f;
+    float3 m_f3CustomRlghBeta, m_f3CustomMieBeta, m_f3CustomOzoneAbsoprtion;
 
-  RefCntAutoPtr<ITexture> m_pOffscreenColorBuffer;
-  RefCntAutoPtr<ITexture> m_pOffscreenDepthBuffer;
+    RefCntAutoPtr<ITexture> m_pOffscreenColorBuffer;
+    RefCntAutoPtr<ITexture> m_pOffscreenDepthBuffer;
 
-  float      m_fCameraYaw   = 0.23f;
-  float      m_fCameraPitch = 0.18f;
-  MouseState m_LastMouseState;
+    float      m_fCameraYaw   = 0.23f;
+    float      m_fCameraPitch = 0.18f;
+    MouseState m_LastMouseState;
 
-  bool m_bRG16UFmtSupported = false;
-  bool m_bRG32FFmtSupported = false;
+    bool m_bRG16UFmtSupported = false;
+    bool m_bRG32FFmtSupported = false;
 };
 
 } // namespace Diligent

@@ -45,44 +45,47 @@
 
 #pragma once
 
-#include "DynamicQuadTreeNode.hpp"
 #include <vector>
+#include "DynamicQuadTreeNode.hpp"
 
 namespace Diligent
 {
 
 // Template class implementing hierarchy array, which is a quad tree indexed by
-// quad tree node location
+// quad tree node location_
 template <class T>
 class HierarchyArray
 {
 public:
-  T& operator[](const QuadTreeNodePosition& at)
-  {
-    return data_[at.level][static_cast<size_t>(at.horz_order) + (static_cast<size_t>(at.vert_order) << at.level)];
-  }
-  const T& operator[](const QuadTreeNodePosition& at) const
-  {
-    return data_[at.level][static_cast<size_t>(at.horz_order) + (static_cast<size_t>(at.vert_order) << at.level)];
-  }
-
-  void Resize(size_t numLevelsInHierarchy)
-  {
-    data_.resize(numLevelsInHierarchy);
-    if (numLevelsInHierarchy)
+    T& operator[](const QuadTreeNodeLocation& at)
     {
-      for (size_t level = numLevelsInHierarchy; level--;)
-      {
-        size_t numElementsInLevel = (size_t)1 << level;
-        data_[level].resize(numElementsInLevel * numElementsInLevel);
-      }
+        return m_data[at.level][at.horz + (at.vert << at.level)];
     }
-  }
+    const T& operator[](const QuadTreeNodeLocation& at) const
+    {
+        return m_data[at.level][at.horz + (at.vert << at.level)];
+    }
 
-  bool Empty() const { return data_.empty(); }
+    void Resize(size_t numLevelsInHierarchy)
+    {
+        m_data.resize(numLevelsInHierarchy);
+        if (numLevelsInHierarchy)
+        {
+            for (size_t level = numLevelsInHierarchy; level--;)
+            {
+                size_t numElementsInLevel = (size_t)1 << level;
+                m_data[level].resize(numElementsInLevel * numElementsInLevel);
+            }
+        }
+    }
+
+    bool Empty() const
+    {
+        return m_data.empty();
+    }
 
 private:
-  std::vector<std::vector<T>> data_;
+    std::vector<std::vector<T>> m_data;
 };
 
 } // namespace Diligent
