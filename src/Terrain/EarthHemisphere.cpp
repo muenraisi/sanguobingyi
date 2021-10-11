@@ -210,11 +210,11 @@ void ComputeVertexHeight(HemisphereVertex&          Vertex,
 
     float fCol   = f3PosWS.x / fSamplingStep;
     float fRow   = f3PosWS.z / fSamplingStep;
-    float fDispl = pDataSource->GetInterpolatedHeight(fCol, fRow);
+    float fDispl = pDataSource->GetInterpolateHeight(fCol, fRow);
     int   iColOffset, iRowOffset;
     pDataSource->GetOffsets(iColOffset, iRowOffset);
-    Vertex.f2MaskUV0.x = (fCol + (float)iColOffset + 0.5f) / (float)pDataSource->GetNumCols();
-    Vertex.f2MaskUV0.y = (fRow + (float)iRowOffset + 0.5f) / (float)pDataSource->GetNumRows();
+    Vertex.f2MaskUV0.x = (fCol + (float)iColOffset + 0.5f) / (float)pDataSource->GetDimCol();
+    Vertex.f2MaskUV0.y = (fRow + (float)iRowOffset + 0.5f) / (float)pDataSource->GetDimRow();
 
     float3 f3SphereNormal = normalize(f3PosWS);
     f3PosWS += f3SphereNormal * fDispl * fSampleScale;
@@ -660,8 +660,8 @@ void EarthHemsiphere::Create(class ElevationDataSource* pDataSource,
     const Uint16* pHeightMap;
     size_t        HeightMapPitch;
     pDataSource->GetDataPtr(pHeightMap, HeightMapPitch);
-    Uint32 iHeightMapDim = pDataSource->GetNumCols();
-    VERIFY_EXPR(iHeightMapDim == pDataSource->GetNumRows());
+    Uint32 iHeightMapDim = pDataSource->GetDimCol();
+    VERIFY_EXPR(iHeightMapDim == pDataSource->GetDimRow());
 
     TextureDesc NormalMapDesc;
     NormalMapDesc.Name      = "Normal map texture";

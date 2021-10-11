@@ -46,239 +46,209 @@
 #include <algorithm>
 #include <cmath>
 
+#include "BasicFileStream.hpp"
+#include "DataBlobImpl.hpp"
 #include "ElevationDataSource.hpp"
 #include "FileWrapper.hpp"
-#include "DataBlobImpl.hpp"
-#include "Image.h"
-#include "BasicFileStream.hpp"
-#include "TextureUtilities.h"
 #include "GraphicsAccessories.hpp"
+#include "Image.h"
+#include "TextureUtilities.h"
 
 namespace Diligent
 {
 
 // Creates data source from the specified raw data file
-ElevationDataSource::ElevationDataSource(const Char* strSrcDemFile) :
-    m_iNumLevels(0),
-    m_iPatchSize(128),
-    m_iColOffset(0),
-    m_iRowOffset(0)
+ElevationDataSource::ElevationDataSource(const Char* src_file) : num_levels_(0), patch_size_(128), col_offset_(0), row_offset_(0)
 {
 
-#if 1
-    RefCntAutoPtr<Image> pHeightMap;
-    CreateImageFromFile(strSrcDemFile, &pHeightMap);
+#if 1 // read height map from file
+  RefCntAutoPtr<Image> height_map_image;
+  CreateImageFromFile(src_file, &height_map_image);
 
-    const auto& ImgInfo    = pHeightMap->GetDesc();
-    auto*       pImageData = pHeightMap->GetData();
-    // Calculate minimal number of columns and rows
-    // in the form 2^n+1 that encompass the data
-    m_iNumCols = 1;
-    m_iNumRows = 1;
-    while (m_iNumCols + 1 < ImgInfo.Width || m_iNumRows + 1 < ImgInfo.Height)
-    {
-        m_iNumCols *= 2;
-        m_iNumRows *= 2;
-    }
+  const auto& img_info   = height_map_image->GetDesc();
+  auto*       image_data = height_map_image->GetData();
+  // Calculate minimal number of columns and rows in the form 2^n+1 that encompass the data to ensure the mask map repeateable
+  dim_col_ = 1;
+  dim_row_ = 1;
+  while (dim_col_ + 1 < img_info.Width || dim_row_ + 1 < img_info.Height)
+  {
+    dim_col_ *= 2;
+    dim_row_ *= 2;
+  }
 
-    m_iNumLevels = 1;
-    while ((m_iPatchSize << (m_iNumLevels - 1)) < (int)m_iNumCols ||
-           (m_iPatchSize << (m_iNumLevels - 1)) < (int)m_iNumRows)
-        m_iNumLevels++;
+  num_levels_ = 1;
+  while ((patch_size_ << (num_levels_ - 1)) < dim_col_ || (patch_size_ << (num_levels_ - 1)) < dim_row_) num_levels_++;
 
-    m_iNumCols++;
-    m_iNumRows++;
-    m_iStride = (m_iNumCols + 1) & (-2);
+  dim_col_++;
+  dim_row_++;
+  stride_ = dim_col_;
+  //stride_ = (num_cols_ + 1) & (-2); // -2 is 1111 1110 , to ensure num_cols_ is odd
 
-    // Load the data
-    m_TheHeightMap.resize(size_t{m_iStride} * size_t{m_iNumRows});
+  // Load the data
+  height_map_.resize(dim_row_ * static_cast<size_t>(stride_));
 
-    VERIFY(ImgInfo.ComponentType == VT_UINT16 && ImgInfo.NumComponents == 1, "Unexpected scanline size: 16-bit single-channel image is expected");
-    auto* pSrcImgData = reinterpret_cast<Uint8*>(pImageData->GetDataPtr());
-    for (Uint32 row = 0; row < ImgInfo.Height; row++, pSrcImgData += ImgInfo.RowStride)
-    {
-        memcpy(&m_TheHeightMap[row * m_iStride], pSrcImgData, size_t{ImgInfo.Width} * size_t{GetValueSize(ImgInfo.ComponentType)});
-    }
+  VERIFY(img_info.ComponentType == VT_UINT16 && img_info.NumComponents == 1, "Unexpected scanline size: 16-bit single-channel image is expected");
+  auto* img_data = reinterpret_cast<Uint8*>(image_data->GetDataPtr());
+  for (Uint32 row = 0; row < img_info.Height; row++, img_data += img_info.RowStride)
+  { memcpy(&height_map_[row * static_cast<size_t>(stride_)], img_data, size_t{img_info.Width} * size_t{GetValueSize(img_info.ComponentType)}); }
 
-    // Duplicate the last row and column
-    for (Uint32 iRow = 0; iRow < ImgInfo.Height; iRow++)
-        for (Uint32 iCol = ImgInfo.Width; iCol < m_iNumCols; iCol++)
-            GetElevSample(iCol, iRow) = GetElevSample((ImgInfo.Width - 1), iRow);
+  // Duplicate the last row and column, why?
+  for (Uint32 iRow = 0; iRow < img_info.Height; iRow++)
+    for (Uint32 iCol = img_info.Width; iCol < dim_col_; iCol++) GetHeight(iCol, iRow) = GetHeight((img_info.Width - 1), iRow);
 
-    for (Uint32 iCol = 0; iCol < m_iNumCols; iCol++)
-        for (Uint32 iRow = ImgInfo.Height; iRow < m_iNumRows; iRow++)
-            GetElevSample(iCol, iRow) = GetElevSample(iCol, ImgInfo.Height - 1);
+  for (Uint32 iCol = 0; iCol < dim_col_; iCol++)
+    for (Uint32 iRow = img_info.Height; iRow < dim_row_; iRow++) GetHeight(iCol, iRow) = GetHeight(iCol, img_info.Height - 1);
 
 #else
-    m_iStride  = 2048;
-    m_iNumRows = m_iNumCols = 2048;
-    m_iNumLevels            = 5;
-    m_TheHeightMap.resize(m_iStride * m_iNumRows);
-    for (Uint32 j = 0; j < m_iNumRows; ++j)
+  stride_   = 2048;
+  num_rows_ = num_cols_ = 2048;
+  num_levels_           = 5;
+  height_map_.resize(num_rows_ * static_cast<size_t>(stride_));
+  for (Uint32 j = 0; j < num_rows_; ++j)
+  {
+    for (Uint32 i = 0; i < num_cols_; ++i)
     {
-        for (Uint32 i = 0; i < m_iNumCols; ++i)
-        {
-            float x = (float)i / (float)m_iNumRows;
-            float y = (float)j / (float)m_iNumCols;
-            float A = 1;
-            float F = 1;
-            float h = 0;
-            for (int Octave = 0; Octave < 8; ++Octave, A *= 0.7f, F *= 1.8f)
-            {
-                h += A * (sin(x * F) * sin(y * 1.5f * F) + 0.5f * (sin((x + y) * 1.3f * F) + cos((x * y) * 1.7f * F)));
-                h = fabs(h - 0.5f);
-            }
-            h = fabs(h) * 32000.f;
-            h = std::min(h, (float)std::numeric_limits<Uint16>::max());
+      float x = (float)i / (float)num_rows_;
+      float y = (float)j / (float)num_cols_;
+      float A = 1;
+      float F = 1;
+      float h = 0;
+      for (int Octave = 0; Octave < 8; ++Octave, A *= 0.7f, F *= 1.8f)
+      {
+        h += A * (sin(x * F) * sin(y * 1.5f * F) + 0.5f * (sin((x + y) * 1.3f * F) + cos((x * y) * 1.7f * F)));
+        h = fabs(h - 0.5f);
+      }
+      h = fabs(h) * 32000.f;
+      h = std::min(h, (float)std::numeric_limits<Uint16>::max());
 
-            GetElevSample(i, j) = (Uint16)h;
-        }
+      GetElevSample(i, j) = (Uint16)h;
     }
+  }
 #endif
-    m_MinMaxElevation.Resize(m_iNumLevels);
+  min_max_elevation_.Resize(num_levels_);
 
-    // Calculate min/max elevations
-    CalculateMinMaxElevations();
+  // Calculate min/max elevations
+  CalculateMinMaxElevations();
 }
 
-ElevationDataSource::~ElevationDataSource(void)
+ElevationDataSource::~ElevationDataSource(void) {}
+
+Uint16 ElevationDataSource::GetGlobalMinElevation() const { return min_max_elevation_[QuadTreeNodeLocation()].first; }
+
+Uint16 ElevationDataSource::GetGlobalMaxElevation() const { return min_max_elevation_[QuadTreeNodeLocation()].second; }
+
+int MirrorCoord(int coord, int dim)
 {
+  coord      = std::abs(coord);
+  int period = coord / dim;
+  coord      = coord % dim;
+  if (period & 0x01) { coord = (dim - 1) - coord; }
+  return coord;
 }
 
-Uint16 ElevationDataSource::GetGlobalMinElevation() const
+inline Uint16& ElevationDataSource::GetHeight(size_t col, size_t row) { return height_map_[col + row * static_cast<size_t>(stride_)]; }
+
+inline Uint16 ElevationDataSource::GetHeight(size_t col, size_t row) const { return height_map_[col + row * static_cast<size_t>(stride_)]; }
+
+/*
+¡¡¡¡step: distance of the data used for interpolated calculation
+*/
+float ElevationDataSource::GetInterpolateHeight(float col, float row, int step) const
 {
-    return m_MinMaxElevation[QuadTreeNodeLocation()].first;
+  int   col_0 = static_cast<int>(floor(col / static_cast<float>(step))) * step;
+  int   row_0 = static_cast<int>(floor(row / static_cast<float>(step))) * step;
+  float w_col = (col - static_cast<float>(col_0)) / static_cast<float>(step);
+  float w_row = (row - static_cast<float>(row_0)) / static_cast<float>(step);
+  col_0 += col_offset_;
+  row_0 += row_offset_;
+
+  int col_1 = col_0 + step;
+  int row_1 = row_0 + step;
+
+  col_0 = MirrorCoord(col_0, dim_col_);
+  col_1 = MirrorCoord(col_1, dim_col_);
+  row_0 = MirrorCoord(row_0, dim_row_);
+  row_1 = MirrorCoord(row_1, dim_row_);
+
+  Uint16 h_00 = GetHeight(col_0, row_0);
+  Uint16 h_10 = GetHeight(col_1, row_0);
+  Uint16 h_01 = GetHeight(col_0, row_1);
+  Uint16 h_11 = GetHeight(col_1, row_1);
+
+  //return (h_00 * w_col + h_10 * (1 - w_col)) * w_row + (h_01 * w_col + h_11 * (1 - w_col)) * (1 - w_row);
+  return (h_00 * (1 - w_col) + h_10 * w_col) * (1 - w_row) + (h_01 * (1 - w_col) + h_11 * w_col) * w_row;
 }
 
-Uint16 ElevationDataSource::GetGlobalMaxElevation() const
+
+/*
+pixel_size: terrain map unit, or scale for each pixel
+*/
+float3 ElevationDataSource::ComputeNormal(float col, float row, float pixel_size, float height_scale, int step) const
 {
-    return m_MinMaxElevation[QuadTreeNodeLocation()].second;
-}
+  float float_step = static_cast<float>(step);
+  float height_1   = GetInterpolateHeight(col + float_step, row, step);
+  float hieght_2   = GetInterpolateHeight(col - float_step, row, step);
+  float height_3   = GetInterpolateHeight(col, row + float_step, step);
+  float height_4   = GetInterpolateHeight(col, row - float_step, step);
 
-int MirrorCoord(int iCoord, int iDim)
-{
-    iCoord      = std::abs(iCoord);
-    int iPeriod = iCoord / iDim;
-    iCoord      = iCoord % iDim;
-    if (iPeriod & 0x01)
-    {
-        iCoord = (iDim - 1) - iCoord;
-    }
-    return iCoord;
-}
+  float3 grad;
+  grad.x = hieght_2 - height_1;
+  grad.y = height_4 - height_3;
+  grad.z = float_step * pixel_size * 2.f;
 
-inline Uint16& ElevationDataSource::GetElevSample(Int32 i, Int32 j)
-{
-    return m_TheHeightMap[i + j * m_iStride];
-}
-
-inline Uint16 ElevationDataSource::GetElevSample(Int32 i, Int32 j) const
-{
-    return m_TheHeightMap[i + j * m_iStride];
-}
-
-float ElevationDataSource::GetInterpolatedHeight(float fCol, float fRow, int iStep) const
-{
-    float fCol0    = floor(fCol);
-    float fRow0    = floor(fRow);
-    int   iCol0    = static_cast<int>(fCol0);
-    int   iRow0    = static_cast<int>(fRow0);
-    iCol0          = (iCol0 / iStep) * iStep;
-    iRow0          = (iRow0 / iStep) * iStep;
-    float fHWeight = (fCol - (float)iCol0) / (float)iStep;
-    float fVWeight = (fRow - (float)iRow0) / (float)iStep;
-    iCol0 += m_iColOffset;
-    iRow0 += m_iRowOffset;
-    //if( iCol0 < 0 || iCol0 >= (int)m_iNumCols || iRow0 < 0 || iRow0 >= (int)m_iNumRows )
-    //    return -FLT_MAX;
-
-    int iCol1 = iCol0 + iStep; //std::min(iCol0+iStep, (int)m_iNumCols-1);
-    int iRow1 = iRow0 + iStep; //std::min(iRow0+iStep, (int)m_iNumRows-1);
-
-    iCol0 = MirrorCoord(iCol0, m_iNumCols);
-    iCol1 = MirrorCoord(iCol1, m_iNumCols);
-    iRow0 = MirrorCoord(iRow0, m_iNumRows);
-    iRow1 = MirrorCoord(iRow1, m_iNumRows);
-
-    Uint16 H00 = GetElevSample(iCol0, iRow0);
-    Uint16 H10 = GetElevSample(iCol1, iRow0);
-    Uint16 H01 = GetElevSample(iCol0, iRow1);
-    Uint16 H11 = GetElevSample(iCol1, iRow1);
-
-    float fInterpolatedHeight = (H00 * (1 - fHWeight) + H10 * fHWeight) * (1 - fVWeight) +
-        (H01 * (1 - fHWeight) + H11 * fHWeight) * fVWeight;
-    return fInterpolatedHeight;
-}
-
-float3 ElevationDataSource::ComputeSurfaceNormal(float fCol, float fRow, float fSampleSpacing, float fHeightScale, int iStep) const
-{
-    float Height1 = GetInterpolatedHeight(fCol + (float)iStep, fRow, iStep);
-    float Height2 = GetInterpolatedHeight(fCol - (float)iStep, fRow, iStep);
-    float Height3 = GetInterpolatedHeight(fCol, fRow + (float)iStep, iStep);
-    float Height4 = GetInterpolatedHeight(fCol, fRow - (float)iStep, iStep);
-
-    float3 Grad;
-    Grad.x = Height2 - Height1;
-    Grad.y = Height4 - Height3;
-    Grad.z = (float)iStep * fSampleSpacing * 2.f;
-
-    Grad.x *= fHeightScale;
-    Grad.y *= fHeightScale;
-    float3 Normal = normalize(Grad);
-
-    return Normal;
+  grad.x *= height_scale;
+  grad.y *= height_scale;
+  return normalize(grad);
 }
 
 void ElevationDataSource::RecomputePatchMinMaxElevations(const QuadTreeNodeLocation& pos)
 {
-    if (pos.level == m_iNumLevels - 1)
-    {
-        std::pair<Uint16, Uint16>& CurrPatchMinMaxElev = m_MinMaxElevation[QuadTreeNodeLocation(pos.horz, pos.vert, pos.level)];
+  if (pos.level == num_levels_ - 1)
+  {
+    std::pair<Uint16, Uint16>& now_patch_min_max_elev = min_max_elevation_[QuadTreeNodeLocation(pos.horz, pos.vert, pos.level)];
 
-        int iStartCol = pos.horz * m_iPatchSize;
-        int iStartRow = pos.vert * m_iPatchSize;
+    int iStartCol = pos.horz * patch_size_;
+    int iStartRow = pos.vert * patch_size_;
 
-        CurrPatchMinMaxElev.first = CurrPatchMinMaxElev.second = GetElevSample(iStartCol, iStartRow);
-        for (int iRow = iStartRow; iRow <= iStartRow + m_iPatchSize; iRow++)
-            for (int iCol = iStartCol; iCol <= iStartCol + m_iPatchSize; iCol++)
-            {
-                Uint16 CurrElev            = GetElevSample(std::min(iCol, (Int32)m_iNumCols - 1), std::min(iRow, (Int32)m_iNumRows - 1));
-                CurrPatchMinMaxElev.first  = std::min(CurrPatchMinMaxElev.first, CurrElev);
-                CurrPatchMinMaxElev.second = std::max(CurrPatchMinMaxElev.second, CurrElev);
-            }
-    }
-    else
-    {
-        std::pair<Uint16, Uint16>& CurrPatchMinMaxElev = m_MinMaxElevation[pos];
-        std::pair<Uint16, Uint16>& LBChildMinMaxElev   = m_MinMaxElevation[GetChildLocation(pos, 0)];
-        std::pair<Uint16, Uint16>& RBChildMinMaxElev   = m_MinMaxElevation[GetChildLocation(pos, 1)];
-        std::pair<Uint16, Uint16>& LTChildMinMaxElev   = m_MinMaxElevation[GetChildLocation(pos, 2)];
-        std::pair<Uint16, Uint16>& RTChildMinMaxElev   = m_MinMaxElevation[GetChildLocation(pos, 3)];
+    now_patch_min_max_elev.first = now_patch_min_max_elev.second = GetHeight(iStartCol, iStartRow);
+    for (Uint32 iRow = iStartRow; iRow <= iStartRow + patch_size_; iRow++)
+      for (Uint32 iCol = iStartCol; iCol <= iStartCol + patch_size_; iCol++)
+      {
+        Uint16 now_elev               = GetHeight(std::min(iCol, (Uint32)dim_col_ - 1), std::min(iRow, (Uint32)dim_row_ - 1));
+        now_patch_min_max_elev.first  = std::min(now_patch_min_max_elev.first, now_elev);
+        now_patch_min_max_elev.second = std::max(now_patch_min_max_elev.second, now_elev);
+      }
+  }
+  else
+  {
+    std::pair<Uint16, Uint16>& now_patch_min_max_elev = min_max_elevation_[pos];
 
-        CurrPatchMinMaxElev.first = std::min(LBChildMinMaxElev.first, RBChildMinMaxElev.first);
-        CurrPatchMinMaxElev.first = std::min(CurrPatchMinMaxElev.first, LTChildMinMaxElev.first);
-        CurrPatchMinMaxElev.first = std::min(CurrPatchMinMaxElev.first, RTChildMinMaxElev.first);
+    std::pair<Uint16, Uint16>& lb_child_min_max_elev = min_max_elevation_[GetChildLocation(pos, 0)];
+    std::pair<Uint16, Uint16>& rb_child_min_max_elev = min_max_elevation_[GetChildLocation(pos, 1)];
+    std::pair<Uint16, Uint16>& lt_child_min_max_elev = min_max_elevation_[GetChildLocation(pos, 2)];
+    std::pair<Uint16, Uint16>& rt_child_min_max_elev = min_max_elevation_[GetChildLocation(pos, 3)];
 
-        CurrPatchMinMaxElev.second = std::max(LBChildMinMaxElev.second, RBChildMinMaxElev.second);
-        CurrPatchMinMaxElev.second = std::max(CurrPatchMinMaxElev.second, LTChildMinMaxElev.second);
-        CurrPatchMinMaxElev.second = std::max(CurrPatchMinMaxElev.second, RTChildMinMaxElev.second);
-    }
+    now_patch_min_max_elev.first = std::min(lb_child_min_max_elev.first, rb_child_min_max_elev.first);
+    now_patch_min_max_elev.first = std::min(now_patch_min_max_elev.first, lt_child_min_max_elev.first);
+    now_patch_min_max_elev.first = std::min(now_patch_min_max_elev.first, rt_child_min_max_elev.first);
+
+    now_patch_min_max_elev.second = std::max(lb_child_min_max_elev.second, rb_child_min_max_elev.second);
+    now_patch_min_max_elev.second = std::max(now_patch_min_max_elev.second, lt_child_min_max_elev.second);
+    now_patch_min_max_elev.second = std::max(now_patch_min_max_elev.second, rt_child_min_max_elev.second);
+  }
 }
 
 // Calculates min/max elevations for the hierarchy
 void ElevationDataSource::CalculateMinMaxElevations()
 {
-    // Calculate min/max elevations starting from the finest level
-    for (HierarchyReverseIterator it(m_iNumLevels); it.IsValid(); it.Next())
-    {
-        RecomputePatchMinMaxElevations(it);
-    }
+  // Calculate min/max elevations starting from the finest level
+  for (HierarchyReverseIterator it(num_levels_); it.IsValid(); it.Next()) { RecomputePatchMinMaxElevations(it); }
 }
 
-void ElevationDataSource::GetDataPtr(const Uint16*& pDataPtr, size_t& Pitch)
+void ElevationDataSource::GetDataPtr(const Uint16*& data_ptr, size_t& stride)
 {
-    pDataPtr = &m_TheHeightMap[0];
-    Pitch    = m_iStride;
+  data_ptr = &height_map_[0];
+  stride   = stride_;
 }
 
 } // namespace Diligent
