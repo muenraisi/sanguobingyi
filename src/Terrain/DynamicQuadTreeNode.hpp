@@ -67,10 +67,10 @@ struct QuadTreeNodeLocation
   QuadTreeNodeLocation() : horz(0), vert(0), level(0) {}
 
   // Gets location_ of a child
-  inline friend QuadTreeNodeLocation GetChildLocation(const QuadTreeNodeLocation& parent, unsigned int birth_order)
+  inline friend QuadTreeNodeLocation GetChildLocation(const QuadTreeNodeLocation& parent, unsigned int birth)
   {
-    VERIFY_EXPR(birth_order >= 0 && birth_order < 4);
-    return QuadTreeNodeLocation(parent.horz * 2 + (birth_order & 1), parent.vert * 2 + (birth_order >> 1), parent.level + 1);
+    VERIFY_EXPR(birth >= 0 && birth < 4);
+    return QuadTreeNodeLocation(parent.horz * 2 + (birth & 1), parent.vert * 2 + (birth >> 1), parent.level + 1);
   }
 
   // Gets location_ of a parent
@@ -185,7 +185,7 @@ public:
   void SetLocation(const QuadTreeNodeLocation& location) { location_ = location; }
 
 private:
-  DynamicQuadTreeNode(RawPtr parent, int birth_order) : parent_(parent), location_(GetChildLocation(parent->location_, birth_order)) {}
+  DynamicQuadTreeNode(RawPtr parent, int birth) : parent_(parent), location_(GetChildLocation(parent->location_, birth)) {}
 
   NodeDataType data_;
 
