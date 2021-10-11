@@ -175,9 +175,10 @@ float ElevationDataSource::GetInterpolateHeight(float col, float row, int step) 
   Uint16 h_01 = GetHeight(col_0, row_1);
   Uint16 h_11 = GetHeight(col_1, row_1);
 
-  return (h_00 * w_col + h_10 * (1 - w_col)) * w_row + (h_01 * w_col + h_11 * (1 - w_col)) * (1 - w_row);
-  /*return (h_00 * (1 - w_col) + h_10 * w_col) * (1 - w_row) + (h_01 * (1 - w_col) + h_11 * w_col) * w_row;*/
+  //return (h_00 * w_col + h_10 * (1 - w_col)) * w_row + (h_01 * w_col + h_11 * (1 - w_col)) * (1 - w_row);
+  return (h_00 * (1 - w_col) + h_10 * w_col) * (1 - w_row) + (h_01 * (1 - w_col) + h_11 * w_col) * w_row;
 }
+
 
 /*
 pixel_size: terrain map unit, or scale for each pixel

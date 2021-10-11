@@ -78,8 +78,8 @@ struct RenderingParams
 
   // Patch rendering params
   TEXTURING_MODE m_TexturingMode  = TM_MATERIAL_MASK_NM;
-  int            m_iRingDimension = 65; // 4K+1
-  int            m_iNumRings      = 15;
+  int            ring_dim = 65; // 4K+1
+  int            num_rings      = 15;
 
   int            m_iNumShadowCascades         = 6;
   int            m_bBestCascadeSearch         = 1;
@@ -93,10 +93,10 @@ struct RenderingParams
 
 struct RingSectorMesh
 {
-  RefCntAutoPtr<IBuffer> pIndBuff;
-  Uint32                 uiNumIndices;
-  BoundBox               BndBox;
-  RingSectorMesh() : uiNumIndices(0) {}
+  RefCntAutoPtr<IBuffer> index_buffer;
+  size_t                 num_indices;
+  BoundBox               bound_box;
+  RingSectorMesh() : num_indices(0) {}
 };
 
 class EarthHemsiphere
@@ -105,11 +105,11 @@ public:
   EarthHemsiphere(void) : m_ValidShaders(0) {}
 
   // clang-format off
-    // 显式的禁用某个函数
-    EarthHemsiphere             (const EarthHemsiphere&) = delete; //默认复制构造禁用
-    EarthHemsiphere& operator = (const EarthHemsiphere&) = delete; //默认赋值构造禁用
-    EarthHemsiphere             (EarthHemsiphere&&)      = delete; //指针复制构造禁用
-    EarthHemsiphere& operator = (EarthHemsiphere&&)      = delete; //指针赋值构造禁用
+  // 显式的禁用某个函数
+  EarthHemsiphere             (const EarthHemsiphere&) = delete; //默认复制构造禁用
+  EarthHemsiphere& operator = (const EarthHemsiphere&) = delete; //默认赋值构造禁用
+  EarthHemsiphere             (EarthHemsiphere&&)      = delete; //指针复制构造禁用
+  EarthHemsiphere& operator = (EarthHemsiphere&&)      = delete; //指针赋值构造禁用
   // clang-format on
 
   // Renders the model
@@ -150,7 +150,7 @@ private:
 
   RenderingParams m_Params;
 
-  RefCntAutoPtr<IRenderDevice> m_pDevice;
+  RefCntAutoPtr<IRenderDevice> device_;
 
   RefCntAutoPtr<IBuffer>      m_pcbTerrainAttribs;
   RefCntAutoPtr<IBuffer>      m_pVertBuff;

@@ -188,12 +188,12 @@ template <typename IndexType>
 class StdIndexGenerator
 {
 public:
-  StdIndexGenerator(IndexType interval) : interaval_(interval) {}
+  StdIndexGenerator(IndexType dim) : dim_(dim) {}
 
-  IndexType operator()(IndexType col, IndexType row, IndexType init = 0) { return col + row * interaval_ + init; }
+  IndexType operator()(IndexType col, IndexType row, IndexType init = 0) { return col + row * dim_ + init; }
 
 private:
-  IndexType interaval_;
+  IndexType dim_;
 };
 
 typedef TriStrip<Uint32, StdIndexGenerator> StdTriStrip32;
@@ -202,8 +202,8 @@ void ComputeVertexHeight(HemisphereVertex& vertex, class ElevationDataSource* el
 {
   float3& world_pos = vertex.world_pos;
 
-  float hm_col     = world_pos.x / sampling_step; // sampling_step is the size by which the height map repeat
-  float hm_row     = world_pos.z / sampling_step;
+  float hm_col   = world_pos.x / sampling_step; // sampling_step is the size by which the height map represents
+  float hm_row   = world_pos.z / sampling_step;
   float altitude = elev_data_src->GetInterpolateHeight(hm_col, hm_row);
   int   col_offset, row_offset;
   elev_data_src->GetOffsets(col_offset, row_offset);
@@ -215,96 +215,95 @@ void ComputeVertexHeight(HemisphereVertex& vertex, class ElevationDataSource* el
   world_pos += sphere_normal * altitude * height_scale;
 }
 
+template <typename IndexType>
 class RingMeshBuilder
 {
 public:
-  RingMeshBuilder(IRenderDevice* pDevice, const std::vector<HemisphereVertex>& VB, int iGridDimenion, std::vector<RingSectorMesh>& RingMeshes) :
-    m_pDevice(pDevice), m_RingMeshes(RingMeshes), m_VB(VB), m_iGridDimenion(iGridDimenion)
+  RingMeshBuilder(IRenderDevice* device, const std::vector<HemisphereVertex>& vertex_buffer, int grid_dim, std::vector<RingSectorMesh>& ring_meshes) :
+    device_(device), ring_meshes_(ring_meshes), vertex_buffer_(vertex_buffer), grid_dim_(grid_dim)
   {}
 
-  void CreateMesh(int iBaseIndex, int iStartCol, int iStartRow, int iNumCols, int iNumRows, QUAD_TRI_TYPE QuadTriangType)
+  void CreateMesh(IndexType base_index, IndexType init_col, IndexType init_row, IndexType num_cols, IndexType num_rows, QUAD_TRI_TYPE quad_tri_type)
   {
-    m_RingMeshes.push_back(RingSectorMesh());
-    auto& CurrMesh = m_RingMeshes.back();
+    ring_meshes_.push_back(RingSectorMesh());
+    RingSectorMesh& now_mesh = ring_meshes_.back();
 
-    std::vector<Uint32> IB;
-    StdTriStrip32       TriStrip(IB, StdIndexGenerator<Uint32>(m_iGridDimenion));
-    TriStrip.AddStrip(iBaseIndex, iStartCol, iStartRow, iNumCols, iNumRows, QuadTriangType);
+    std::vector<IndexType> index_buffer;
+    StdTriStrip32          tri_strip(index_buffer, StdIndexGenerator<IndexType>(grid_dim_));
+    tri_strip.AddStrip(base_index, init_col, init_row, num_cols, num_rows, quad_tri_type);
 
-    CurrMesh.uiNumIndices = (Uint32)IB.size();
+    now_mesh.num_indices = index_buffer.size();
 
     // Prepare buffer description
-    BufferDesc IndexBufferDesc;
-    IndexBufferDesc.Name      = "Ring mesh index buffer";
-    IndexBufferDesc.Size      = (Uint32)(IB.size() * sizeof(IB[0]));
-    IndexBufferDesc.BindFlags = BIND_INDEX_BUFFER;
-    IndexBufferDesc.Usage     = USAGE_IMMUTABLE;
-    BufferData IBInitData;
-    IBInitData.pData    = IB.data();
-    IBInitData.DataSize = IndexBufferDesc.Size;
+    BufferDesc index_buffer_desc;
+    index_buffer_desc.Name      = "Ring mesh index buffer";
+    index_buffer_desc.Size      = index_buffer.size() * sizeof(index_buffer[0]);
+    index_buffer_desc.BindFlags = BIND_INDEX_BUFFER;
+    index_buffer_desc.Usage     = USAGE_IMMUTABLE;
+    BufferData index_buffer_data;
+    index_buffer_data.pData    = index_buffer.data();
+    index_buffer_data.DataSize = index_buffer_desc.Size;
     // Create the buffer
-    m_pDevice->CreateBuffer(IndexBufferDesc, &IBInitData, &CurrMesh.pIndBuff);
-    VERIFY(CurrMesh.pIndBuff, "Failed to create index buffer");
+    device_->CreateBuffer(index_buffer_desc, &index_buffer_data, &now_mesh.index_buffer);
+    VERIFY(now_mesh.index_buffer, "Failed to create index buffer");
 
     // Compute bounding box
-    auto& BB = CurrMesh.BndBox;
-    BB.Max   = float3(-FLT_MAX, -FLT_MAX, -FLT_MAX);
-    BB.Min   = float3(+FLT_MAX, +FLT_MAX, +FLT_MAX);
-    for (auto Ind = IB.begin(); Ind != IB.end(); ++Ind)
+    auto& bound_box = now_mesh.bound_box;
+    bound_box.Max   = float3(-FLT_MAX, -FLT_MAX, -FLT_MAX);
+    bound_box.Min   = float3(+FLT_MAX, +FLT_MAX, +FLT_MAX);
+    for (auto i = index_buffer.begin(); i != index_buffer.end(); ++i)
     {
-      const auto& CurrVert = m_VB[*Ind].world_pos;
+      const auto& now_vert_pos = vertex_buffer_[*i].world_pos;
 
-      BB.Min = std::min(BB.Min, CurrVert);
-      BB.Max = std::max(BB.Max, CurrVert);
+      bound_box.Min = std::min(bound_box.Min, now_vert_pos);
+      bound_box.Max = std::max(bound_box.Max, now_vert_pos);
     }
   }
 
 private:
-  RefCntAutoPtr<IRenderDevice>         m_pDevice;
-  std::vector<RingSectorMesh>&         m_RingMeshes;
-  const std::vector<HemisphereVertex>& m_VB; // vertex buffer
-  const size_t                         m_iGridDimenion;
+  RefCntAutoPtr<IRenderDevice>         device_;
+  std::vector<RingSectorMesh>&         ring_meshes_;
+  const std::vector<HemisphereVertex>& vertex_buffer_; // vertex buffer
+  const IndexType                      grid_dim_;
 };
 
+template <typename IndexType>
 void GenerateSphereGeometry(IRenderDevice*                 pDevice,
                             const float                    earth_radius,
-                            size_t                         grid_dim, // grid dimension
+                            IndexType                      grid_dim, // grid dimension
                             const size_t                   num_rings,
-                            class ElevationDataSource*     elevation_data_source,
+                            class ElevationDataSource*     elev_data_src,
                             float                          sampling_step,
                             float                          height_scale,
                             std::vector<HemisphereVertex>& vert_buff,
                             std::vector<RingSectorMesh>&   sphere_meshes)
 {
+  // Grid dimension of projection sphere, due to symmetry, it should be 2K+1, but why 4K+1
   if ((grid_dim - 1) % 4 != 0)
   {
-    grid_dim = RenderingParams().m_iRingDimension;
-    UNEXPECTED("Grid dimension must be 4k+1. Defaulting to ",
-               grid_dim); // Grid dimension of projection sphere, due to
-                          // symmetry, it should be 2K+1, but why 4K+1
+    grid_dim = RenderingParams().ring_dim;
+    UNEXPECTED("Grid dimension must be 4k+1. Defaulting to ", grid_dim);
   }
-  const size_t              grid_midst = (grid_dim - 1) / 2;
-  const size_t              grid_quart = (grid_dim - 1) / 4;
+  const IndexType           grid_midst = (grid_dim - 1) / 2;
+  const IndexType           grid_quart = (grid_dim - 1) / 4;
   StdIndexGenerator<Uint32> std_index_generator(grid_dim);
+  RingMeshBuilder<Uint32>   ring_mesh_builder(pDevice, vert_buff, grid_dim, sphere_meshes);
 
-  // const int iLargestGridScale = iGridDimension << (iNumRings-1);
-
-  RingMeshBuilder ring_mesh_builder(pDevice, vert_buff, grid_dim, sphere_meshes);
-  size_t          start_ring = 0;
-  vert_buff.reserve((num_rings - start_ring) * grid_dim * grid_dim);
+  size_t start_ring = 0;
+  vert_buff.reserve(num_rings  * grid_dim * grid_dim);
   for (size_t ring = start_ring; ring < num_rings; ++ring)
   {
-    size_t now_grid_init = vert_buff.size();
-    // Why not resize once directly?
-    vert_buff.resize(vert_buff.size() + grid_dim * grid_dim);
+    size_t now_index_init = vert_buff.size();
+    // Why not resize once directly? the actual used size might < grid_dim * grid_dim ?
+    vert_buff.resize(vert_buff.size() + static_cast<size_t>(grid_dim) * static_cast<size_t>(grid_dim));
     // What is grid scale? grid_scale = 2^-(num_rings-1-i_ring)
-    float grid_scale = 1.f / (float)(1 << (num_rings - 1 - ring));
+    float grid_scale = 1.f / static_cast<float>(1 << (num_rings - 1 - ring));
     // Fill vertex buffer
     for (size_t row = 0; row < grid_dim; ++row)
       for (size_t col = 0; col < grid_dim; ++col)
       {
-        auto& now_vert = vert_buff[std_index_generator(col, row, now_grid_init)];
-        auto& pos      = now_vert.world_pos;
+        HemisphereVertex& now_vert = vert_buff[std_index_generator(col, row, now_index_init)];
+        float3&           pos      = now_vert.world_pos;
         // Relative postion in a grid_dim * grid_dim grid
         pos.x = static_cast<float>(col) / static_cast<float>(grid_dim - 1);
         pos.z = static_cast<float>(row) / static_cast<float>(grid_dim - 1);
@@ -333,30 +332,30 @@ void GenerateSphereGeometry(IRenderDevice*                 pDevice,
         pos.z *= earth_radius;
         pos.y *= earth_radius;
 
-        ComputeVertexHeight(now_vert, elevation_data_source, sampling_step, height_scale);
+        ComputeVertexHeight(now_vert, elev_data_src, sampling_step, height_scale);
         pos.y -= earth_radius; // Translate the top to the origin
       }
 
-    // Align vertices on the outer boundary
+    // Align vertices on the outer boundary, it can stil run if we skip this section
     if (ring < num_rings - 1)
     {
       for (size_t i = 1; i < grid_dim - 1; i += 2)
       {
         // Top & bottom boundaries
-        for (size_t iRow = 0; iRow < grid_dim; iRow += grid_dim - 1)
+        for (size_t row = 0; row < grid_dim; row += grid_dim - 1)
         {
-          const auto& V0 = vert_buff[now_grid_init + i - 1 + iRow * grid_dim].world_pos;
-          auto&       V1 = vert_buff[now_grid_init + i + 0 + iRow * grid_dim].world_pos;
-          const auto& V2 = vert_buff[now_grid_init + i + 1 + iRow * grid_dim].world_pos;
+          const auto& V0 = vert_buff[std_index_generator(i - 1, row, now_index_init)].world_pos;
+          auto&       V1 = vert_buff[std_index_generator(i + 0, row, now_index_init)].world_pos;
+          const auto& V2 = vert_buff[std_index_generator(i + 1, row, now_index_init)].world_pos;
           V1             = (V0 + V2) / 2.f;
         }
 
         // Left & right boundaries
-        for (size_t iCol = 0; iCol < grid_dim; iCol += grid_dim - 1)
+        for (size_t col = 0; col < grid_dim; col += grid_dim - 1)
         {
-          const auto& V0 = vert_buff[now_grid_init + iCol + (i - 1) * grid_dim].world_pos;
-          auto&       V1 = vert_buff[now_grid_init + iCol + (i + 0) * grid_dim].world_pos;
-          const auto& V2 = vert_buff[now_grid_init + iCol + (i + 1) * grid_dim].world_pos;
+          const auto& V0 = vert_buff[std_index_generator(col, i - 1, now_index_init)].world_pos;
+          auto&       V1 = vert_buff[std_index_generator(col, i + 0, now_index_init)].world_pos;
+          const auto& V2 = vert_buff[std_index_generator(col, i + 1, now_index_init)].world_pos;
           V1             = (V0 + V2) / 2.f;
         }
       }
@@ -365,33 +364,35 @@ void GenerateSphereGeometry(IRenderDevice*                 pDevice,
     // Generate indices for the current ring
     if (ring == 0)
     {
+      //ring_mesh_builder.CreateMesh(now_index_init, 0         , 0         , grid_dim +1, grid_dim + 1, QUAD_TRI_TYPE::DIAG_00_11);?
       // clang-format off
-			ring_mesh_builder.CreateMesh(now_grid_init, 0, 0, grid_midst + 1, grid_midst + 1, QUAD_TRI_TYPE::DIAG_00_11);
-			ring_mesh_builder.CreateMesh(now_grid_init, grid_midst, 0, grid_midst + 1, grid_midst + 1, QUAD_TRI_TYPE::DIAG_01_10);
-			ring_mesh_builder.CreateMesh(now_grid_init, 0, grid_midst, grid_midst + 1, grid_midst + 1, QUAD_TRI_TYPE::DIAG_01_10);
-			ring_mesh_builder.CreateMesh(now_grid_init, grid_midst, grid_midst, grid_midst + 1, grid_midst + 1, QUAD_TRI_TYPE::DIAG_00_11);
+			ring_mesh_builder.CreateMesh(now_index_init, 0         , 0         , grid_midst + 1, grid_midst + 1, QUAD_TRI_TYPE::DIAG_00_11);
+			ring_mesh_builder.CreateMesh(now_index_init, grid_midst, 0         , grid_midst + 1, grid_midst + 1, QUAD_TRI_TYPE::DIAG_01_10);
+			ring_mesh_builder.CreateMesh(now_index_init, 0         , grid_midst, grid_midst + 1, grid_midst + 1, QUAD_TRI_TYPE::DIAG_01_10);
+			ring_mesh_builder.CreateMesh(now_index_init, grid_midst, grid_midst, grid_midst + 1, grid_midst + 1, QUAD_TRI_TYPE::DIAG_00_11);
       // clang-format on
     }
     else
     {
       // clang-format off
-			ring_mesh_builder.CreateMesh(now_grid_init, 0, 0, grid_quart + 1, grid_quart + 1, QUAD_TRI_TYPE::DIAG_00_11);
-			ring_mesh_builder.CreateMesh(now_grid_init, grid_quart, 0, grid_quart + 1, grid_quart + 1, QUAD_TRI_TYPE::DIAG_00_11);
+			ring_mesh_builder.CreateMesh(now_index_init, 0         , 0, grid_quart + 1, grid_quart + 1, QUAD_TRI_TYPE::DIAG_00_11);
+			ring_mesh_builder.CreateMesh(now_index_init, grid_quart, 0, grid_quart + 1, grid_quart + 1, QUAD_TRI_TYPE::DIAG_00_11);
+      //ring_mesh_builder.CreateMesh(now_index_init, 0, 0, grid_midst + 1, grid_quart + 1, QUAD_TRI_TYPE::DIAG_00_11);
 
-			ring_mesh_builder.CreateMesh(now_grid_init, grid_midst, 0, grid_quart + 1, grid_quart + 1, QUAD_TRI_TYPE::DIAG_01_10);
-			ring_mesh_builder.CreateMesh(now_grid_init, grid_quart * 3, 0, grid_quart + 1, grid_quart + 1, QUAD_TRI_TYPE::DIAG_01_10);
+			ring_mesh_builder.CreateMesh(now_index_init, grid_midst    , 0, grid_quart + 1, grid_quart + 1, QUAD_TRI_TYPE::DIAG_01_10);
+			ring_mesh_builder.CreateMesh(now_index_init, grid_quart * 3, 0, grid_quart + 1, grid_quart + 1, QUAD_TRI_TYPE::DIAG_01_10);
 
-			ring_mesh_builder.CreateMesh(now_grid_init, 0, grid_quart, grid_quart + 1, grid_quart + 1, QUAD_TRI_TYPE::DIAG_00_11);
-			ring_mesh_builder.CreateMesh(now_grid_init, 0, grid_midst, grid_quart + 1, grid_quart + 1, QUAD_TRI_TYPE::DIAG_01_10);
+			ring_mesh_builder.CreateMesh(now_index_init, 0, grid_quart, grid_quart + 1, grid_quart + 1, QUAD_TRI_TYPE::DIAG_00_11);
+			ring_mesh_builder.CreateMesh(now_index_init, 0, grid_midst, grid_quart + 1, grid_quart + 1, QUAD_TRI_TYPE::DIAG_01_10);
 
-			ring_mesh_builder.CreateMesh(now_grid_init, grid_quart * 3, grid_quart, grid_quart + 1, grid_quart + 1, QUAD_TRI_TYPE::DIAG_01_10);
-			ring_mesh_builder.CreateMesh(now_grid_init, grid_quart * 3, grid_midst, grid_quart + 1, grid_quart + 1, QUAD_TRI_TYPE::DIAG_00_11);
+			ring_mesh_builder.CreateMesh(now_index_init, grid_quart * 3, grid_quart, grid_quart + 1, grid_quart + 1, QUAD_TRI_TYPE::DIAG_01_10);
+			ring_mesh_builder.CreateMesh(now_index_init, grid_quart * 3, grid_midst, grid_quart + 1, grid_quart + 1, QUAD_TRI_TYPE::DIAG_00_11);
 
-			ring_mesh_builder.CreateMesh(now_grid_init, 0, grid_quart * 3, grid_quart + 1, grid_quart + 1, QUAD_TRI_TYPE::DIAG_01_10);
-			ring_mesh_builder.CreateMesh(now_grid_init, grid_quart, grid_quart * 3, grid_quart + 1, grid_quart + 1, QUAD_TRI_TYPE::DIAG_01_10);
+			ring_mesh_builder.CreateMesh(now_index_init, 0         , grid_quart * 3, grid_quart + 1, grid_quart + 1, QUAD_TRI_TYPE::DIAG_01_10);
+			ring_mesh_builder.CreateMesh(now_index_init, grid_quart, grid_quart * 3, grid_quart + 1, grid_quart + 1, QUAD_TRI_TYPE::DIAG_01_10);
 
-			ring_mesh_builder.CreateMesh(now_grid_init, grid_midst, grid_quart * 3, grid_quart + 1, grid_quart + 1, QUAD_TRI_TYPE::DIAG_00_11);
-			ring_mesh_builder.CreateMesh(now_grid_init, grid_quart * 3, grid_quart * 3, grid_quart + 1, grid_quart + 1, QUAD_TRI_TYPE::DIAG_00_11);
+			ring_mesh_builder.CreateMesh(now_index_init, grid_midst    , grid_quart * 3, grid_quart + 1, grid_quart + 1, QUAD_TRI_TYPE::DIAG_00_11);
+			ring_mesh_builder.CreateMesh(now_index_init, grid_quart * 3, grid_quart * 3, grid_quart + 1, grid_quart + 1, QUAD_TRI_TYPE::DIAG_00_11);
       // clang-format on
     }
   }
@@ -401,15 +402,15 @@ void GenerateSphereGeometry(IRenderDevice*                 pDevice,
 #if 0
 		// Compute normals
 	const float3* pV0 = nullptr;
-	const float3* pV1 = &VB[IB[0]].f3WorldPos;
-	const float3* pV2 = &VB[IB[1]].f3WorldPos;
+	const float3* pV1 = &vertex_buffer[index_buffer[0]].f3WorldPos;
+	const float3* pV2 = &vertex_buffer[index_buffer[1]].f3WorldPos;
 	float fSign = +1;
-	for (Uint32 Ind = 2; Ind < m_uiIndicesInIndBuff; ++Ind)
+	for (Uint32 i = 2; i < m_uiIndicesInIndBuff; ++i)
 	{
 		fSign = -fSign;
 		pV0 = pV1;
 		pV1 = pV2;
-		pV2 = &VB[IB[Ind]].f3WorldPos;
+		pV2 = &vertex_buffer[index_buffer[i]].f3WorldPos;
 		float3 Rib0 = *pV0 - *pV1;
 		float3 Rib1 = *pV1 - *pV2;
 		float3 TriN;
@@ -419,10 +420,10 @@ void GenerateSphereGeometry(IRenderDevice*                 pDevice,
 		{
 			TriN /= fLength * fSign;
 			for (int i = -2; i <= 0; ++i)
-				VB[IB[Ind + i]].f3Normal += TriN;
+				vertex_buffer[index_buffer[i + i]].f3Normal += TriN;
 		}
 	}
-	for (auto VBIt = VB.begin(); VBIt != VB.end(); ++VBIt)
+	for (auto VBIt = vertex_buffer.begin(); VBIt != vertex_buffer.end(); ++VBIt)
 	{
 		float fLength = D3DXVec3Length(&VBIt->f3Normal);
 		if (fLength > 1)
@@ -442,31 +443,31 @@ void GenerateSphereGeometry(IRenderDevice*                 pDevice,
 				const int NextGridPffsets[] = { iGridQuart, iGridQuart * 3 };
 				// Left and right boundaries
 				{
-					auto& CurrGridN = VB[iCurrGridStart + CurrGridOffsets[Bnd] + i * iGridDimension].f3Normal;
-					auto& NextGridN = VB[iNextGridStart + NextGridPffsets[Bnd] + (iGridQuart + i / 2) * iGridDimension].f3Normal;
+					auto& CurrGridN = vertex_buffer[iCurrGridStart + CurrGridOffsets[Bnd] + i * iGridDimension].f3Normal;
+					auto& NextGridN = vertex_buffer[iNextGridStart + NextGridPffsets[Bnd] + (iGridQuart + i / 2) * iGridDimension].f3Normal;
 					auto NewN = CurrGridN + NextGridN;
 					D3DXVec3Normalize(&NewN, &NewN);
 					CurrGridN = NextGridN = NewN;
 					if (i > 1)
 					{
-						auto& PrevCurrGridN = VB[iCurrGridStart + CurrGridOffsets[Bnd] + (i - 2) * iGridDimension].f3Normal;
+						auto& PrevCurrGridN = vertex_buffer[iCurrGridStart + CurrGridOffsets[Bnd] + (i - 2) * iGridDimension].f3Normal;
 						auto MiddleN = PrevCurrGridN + NewN;
-						D3DXVec3Normalize(&VB[iCurrGridStart + CurrGridOffsets[Bnd] + (i - 1) * iGridDimension].f3Normal, &MiddleN);
+						D3DXVec3Normalize(&vertex_buffer[iCurrGridStart + CurrGridOffsets[Bnd] + (i - 1) * iGridDimension].f3Normal, &MiddleN);
 					}
 				}
 
 				// Bottom and top boundaries
 				{
-					auto& CurrGridN = VB[iCurrGridStart + i + CurrGridOffsets[Bnd] * iGridDimension].f3Normal;
-					auto& NextGridN = VB[iNextGridStart + (iGridQuart + i / 2) + NextGridPffsets[Bnd] * iGridDimension].f3Normal;
+					auto& CurrGridN = vertex_buffer[iCurrGridStart + i + CurrGridOffsets[Bnd] * iGridDimension].f3Normal;
+					auto& NextGridN = vertex_buffer[iNextGridStart + (iGridQuart + i / 2) + NextGridPffsets[Bnd] * iGridDimension].f3Normal;
 					auto NewN = CurrGridN + NextGridN;
 					D3DXVec3Normalize(&NewN, &NewN);
 					CurrGridN = NextGridN = NewN;
 					if (i > 1)
 					{
-						auto& PrevCurrGridN = VB[iCurrGridStart + (i - 2) + CurrGridOffsets[Bnd] * iGridDimension].f3Normal;
+						auto& PrevCurrGridN = vertex_buffer[iCurrGridStart + (i - 2) + CurrGridOffsets[Bnd] * iGridDimension].f3Normal;
 						auto MiddleN = PrevCurrGridN + NewN;
-						D3DXVec3Normalize(&VB[iCurrGridStart + (i - 1) + CurrGridOffsets[Bnd] * iGridDimension].f3Normal, &MiddleN);
+						D3DXVec3Normalize(&vertex_buffer[iCurrGridStart + (i - 1) + CurrGridOffsets[Bnd] * iGridDimension].f3Normal, &MiddleN);
 					}
 				}
 			}
@@ -540,7 +541,7 @@ void EarthHemsiphere::RenderNormalMap(IRenderDevice*  pDevice,
   m_pResMapping->AddResource("cbNMGenerationAttribs", pcbNMGenerationAttribs, true);
 
   RefCntAutoPtr<IShaderSourceInputStreamFactory> pShaderSourceFactory;
-  m_pDevice->GetEngineFactory()->CreateDefaultShaderSourceStreamFactory("shaders\\;shaders\\terrain", &pShaderSourceFactory);
+  device_->GetEngineFactory()->CreateDefaultShaderSourceStreamFactory("shaders\\;shaders\\terrain", &pShaderSourceFactory);
 
   ShaderCreateInfo ShaderCI;
   ShaderCI.pShaderSourceStreamFactory = pShaderSourceFactory;
@@ -638,7 +639,7 @@ void EarthHemsiphere::Create(class ElevationDataSource* pDataSource,
                              IBuffer*                   pcMediaScatteringParams)
 {
   m_Params  = Params;
-  m_pDevice = pDevice;
+  device_ = pDevice;
 
   const Uint16* pHeightMap;
   size_t        HeightMapPitch;
@@ -704,12 +705,12 @@ void EarthHemsiphere::Create(class ElevationDataSource* pDataSource,
   m_pResMapping->AddResourceArray("g_tex2DTileDiffuse", 0, ptex2DTileDiffuseSRV, NUM_TILE_TEXTURES, true);
   m_pResMapping->AddResourceArray("g_tex2DTileNM", 0, ptex2DTileNMSRV, NUM_TILE_TEXTURES, true);
 
-  m_pDevice->CreateSampler(Sam_ComparsionLinearClamp, &m_pComparisonSampler);
+  device_->CreateSampler(Sam_ComparsionLinearClamp, &m_pComparisonSampler);
 
   RenderNormalMap(pDevice, pContext, pHeightMap, HeightMapPitch, iHeightMapDim, ptex2DNormalMap);
 
   RefCntAutoPtr<IShaderSourceInputStreamFactory> pShaderSourceFactory;
-  m_pDevice->GetEngineFactory()->CreateDefaultShaderSourceStreamFactory("shaders;shaders\\terrain;", &pShaderSourceFactory);
+  device_->GetEngineFactory()->CreateDefaultShaderSourceStreamFactory("shaders;shaders\\terrain;", &pShaderSourceFactory);
 
   {
     ShaderCreateInfo ShaderCI;
@@ -764,8 +765,9 @@ void EarthHemsiphere::Create(class ElevationDataSource* pDataSource,
   }
 
   std::vector<HemisphereVertex> VB;
-  GenerateSphereGeometry(pDevice, Diligent::AirScatteringAttribs().fEarthRadius, m_Params.m_iRingDimension, m_Params.m_iNumRings, pDataSource,
-                         m_Params.m_TerrainAttribs.m_fElevationSamplingInterval, m_Params.m_TerrainAttribs.m_fElevationScale, VB, m_SphereMeshes);
+  GenerateSphereGeometry<Uint32>(pDevice, Diligent::AirScatteringAttribs().fEarthRadius, m_Params.ring_dim, m_Params.num_rings, pDataSource,
+                                 m_Params.m_TerrainAttribs.m_fElevationSamplingInterval, m_Params.m_TerrainAttribs.m_fElevationScale, VB,
+                                 m_SphereMeshes);
 
   BufferDesc VBDesc;
   VBDesc.Name      = "Hemisphere vertex buffer";
@@ -776,7 +778,7 @@ void EarthHemsiphere::Create(class ElevationDataSource* pDataSource,
   VBInitData.pData    = VB.data();
   VBInitData.DataSize = VBDesc.Size;
   pDevice->CreateBuffer(VBDesc, &VBInitData, &m_pVertBuff);
-  VERIFY(m_pVertBuff, "Failed to create VB");
+  VERIFY(m_pVertBuff, "Failed to create vertex_buffer");
 }
 
 void EarthHemsiphere::Render(IDeviceContext*        pContext,
@@ -815,7 +817,7 @@ void EarthHemsiphere::Render(IDeviceContext*        pContext,
     Attrs.UseCombinedTextureSamplers = true;
     Attrs.SourceLanguage             = SHADER_SOURCE_LANGUAGE_HLSL;
     RefCntAutoPtr<IShaderSourceInputStreamFactory> pShaderSourceFactory;
-    m_pDevice->GetEngineFactory()->CreateDefaultShaderSourceStreamFactory("shaders;shaders\\terrain;", &pShaderSourceFactory);
+    device_->GetEngineFactory()->CreateDefaultShaderSourceStreamFactory("shaders;shaders\\terrain;", &pShaderSourceFactory);
     Attrs.pShaderSourceStreamFactory = pShaderSourceFactory;
 
     std::array<ImmutableSamplerDesc, 5> ImtblSamplers = {};
@@ -858,7 +860,7 @@ void EarthHemsiphere::Render(IDeviceContext*        pContext,
     Attrs.Macros = Macros;
 
     RefCntAutoPtr<IShader> pHemispherePS;
-    m_pDevice->CreateShader(Attrs, &pHemispherePS);
+    device_->CreateShader(Attrs, &pHemispherePS);
 
     LayoutElement Inputs[] = {{0, 0, 3, VT_FLOAT32}, {1, 0, 2, VT_FLOAT32}};
 
@@ -894,14 +896,14 @@ void EarthHemsiphere::Render(IDeviceContext*        pContext,
     GraphicsPipeline.NumRenderTargets                     = 1;
     GraphicsPipeline.DSVFormat                            = TEX_FORMAT_D32_FLOAT;
     GraphicsPipeline.PrimitiveTopology                    = PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP;
-    m_pDevice->CreateGraphicsPipelineState(PSOCreateInfo, &m_pHemispherePSO);
+    device_->CreateGraphicsPipelineState(PSOCreateInfo, &m_pHemispherePSO);
     m_pHemispherePSO->BindStaticResources(SHADER_TYPE_VERTEX | SHADER_TYPE_PIXEL, m_pResMapping, BIND_SHADER_RESOURCES_VERIFY_ALL_RESOLVED);
     m_pHemispherePSO->CreateShaderResourceBinding(&m_pHemisphereSRB, true);
     m_pHemisphereSRB->BindResources(SHADER_TYPE_VERTEX, m_pResMapping, BIND_SHADER_RESOURCES_KEEP_EXISTING);
   }
 
   ViewFrustumExt ViewFrustum;
-  auto           DevType = m_pDevice->GetDeviceInfo().Type;
+  auto           DevType = device_->GetDeviceInfo().Type;
   ExtractViewFrustumPlanesFromMatrix(CameraViewProjMatrix, ViewFrustum, DevType == RENDER_DEVICE_TYPE_D3D11 || DevType == RENDER_DEVICE_TYPE_D3D12);
 
   {
@@ -953,11 +955,11 @@ void EarthHemsiphere::Render(IDeviceContext*        pContext,
 
   for (auto MeshIt = m_SphereMeshes.begin(); MeshIt != m_SphereMeshes.end(); ++MeshIt)
   {
-    if (GetBoxVisibility(ViewFrustum, MeshIt->BndBox, bZOnlyPass ? FRUSTUM_PLANE_FLAG_OPEN_NEAR : FRUSTUM_PLANE_FLAG_FULL_FRUSTUM) !=
+    if (GetBoxVisibility(ViewFrustum, MeshIt->bound_box, bZOnlyPass ? FRUSTUM_PLANE_FLAG_OPEN_NEAR : FRUSTUM_PLANE_FLAG_FULL_FRUSTUM) !=
         BoxVisibility::Invisible)
     {
-      pContext->SetIndexBuffer(MeshIt->pIndBuff, 0, RESOURCE_STATE_TRANSITION_MODE_TRANSITION);
-      DrawIndexedAttribs DrawAttrs(MeshIt->uiNumIndices, VT_UINT32, DRAW_FLAG_VERIFY_ALL);
+      pContext->SetIndexBuffer(MeshIt->index_buffer, 0, RESOURCE_STATE_TRANSITION_MODE_TRANSITION);
+      DrawIndexedAttribs DrawAttrs(MeshIt->num_indices, VT_UINT32, DRAW_FLAG_VERIFY_ALL);
       pContext->DrawIndexed(DrawAttrs);
     }
   }
