@@ -115,7 +115,7 @@ struct LightAttribs
 
 struct CameraAttribs
 {
-    float4 f4Position;     // Camera world position
+    float4 f4Position;     // Camera world Position
     float4 f4ViewportSize; // (width, height, 1/width, 1/height)
 
     float2 f2ViewportOrigin; // (min x, min y)
