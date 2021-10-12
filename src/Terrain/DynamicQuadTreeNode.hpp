@@ -51,7 +51,7 @@
 namespace Diligent
 {
 
-// Structure describing quad tree node location_
+// Structure describing quad tree node location
 struct QuadTreeNodeLocation
 {
   // Position in a tree
@@ -61,19 +61,30 @@ struct QuadTreeNodeLocation
 
   QuadTreeNodeLocation(int h, int v, int l) : horz(h), vert(v), level(l)
   {
-    VERIFY_EXPR(h < (1 << l));
-    VERIFY_EXPR(v < (1 << l));
+    VERIFY_EXPR(h < (1 << l)); // h< 2^l
+    VERIFY_EXPR(v < (1 << l)); // v< 2^l
   }
   QuadTreeNodeLocation() : horz(0), vert(0), level(0) {}
 
-  // Gets location_ of a child
-  inline friend QuadTreeNodeLocation GetChildLocation(const QuadTreeNodeLocation& parent, unsigned int birth)
+  // Gets position of a child
+  /*
+    -----------------
+    |       |       |
+    |   2   |   3   |
+    |       |       |
+    -----------------
+    |       |       |
+    |   0   |   1   |
+    |       |       |
+    -----------------
+    */
+  inline friend QuadTreeNodeLocation GetChildLocation(const QuadTreeNodeLocation& parent, unsigned int birth_order)
   {
-    VERIFY_EXPR(birth >= 0 && birth < 4);
-    return QuadTreeNodeLocation(parent.horz * 2 + (birth & 1), parent.vert * 2 + (birth >> 1), parent.level + 1);
+    VERIFY_EXPR(birth_order >= 0 && birth_order < 4);
+    return QuadTreeNodeLocation(parent.horz * 2 + (birth_order & 1), parent.vert * 2 + (birth_order >> 1), parent.level + 1);
   }
 
-  // Gets location_ of a parent
+  // Gets location of a parent
   inline friend QuadTreeNodeLocation GetParentLocation(const QuadTreeNodeLocation& node)
   {
     assert(node.level > 0);
@@ -92,24 +103,24 @@ public:
 
 protected:
   QuadTreeNodeLocation now_;
-  int                  side_size_;
+  int                  side_number_{1};
 };
 
 // Iterator for recursively traversing the quad tree starting from the root up to the specified level
 class HierarchyIterator : public HierarchyIteratorBase
 {
 public:
-  HierarchyIterator(int max_levels) : max_levels_(max_levels) { side_size_ = 1; }
+  HierarchyIterator(int max_levels) : max_levels_(max_levels) {}
   bool IsValid() const { return now_.level < max_levels_; }
   void Next()
   {
-    if (++now_.horz == side_size_)
+    if (++now_.horz == side_number_)
     {
       now_.horz = 0;
-      if (++now_.vert == side_size_)
+      if (++now_.vert == side_number_)
       {
-        now_.vert  = 0;
-        side_size_ = 1 << ++now_.level;
+        now_.vert = 0;
+        side_number_ = 1 << ++now_.level;
       }
     }
   }
@@ -124,19 +135,19 @@ class HierarchyReverseIterator : public HierarchyIteratorBase
 public:
   HierarchyReverseIterator(int max_levels)
   {
-    now_.level = max_levels - 1;
-    side_size_ = 1 << now_.level;
+    now_.level      = max_levels - 1;
+    side_number_ = 1 << now_.level;
   }
   bool IsValid() const { return now_.level >= 0; }
   void Next()
   {
-    if (++now_.horz == side_size_)
+    if (++now_.horz == side_number_)
     {
       now_.horz = 0;
-      if (++now_.vert == side_size_)
+      if (++now_.vert == side_number_)
       {
-        now_.vert  = 0;
-        side_size_ = 1 << --now_.level;
+        now_.vert = 0;
+        side_number_ = 1 << --now_.level;
       }
     }
   }
@@ -155,7 +166,7 @@ public:
   NodeDataType&       GetData() { return data_; }
   const NodeDataType& GetData() const { return data_; }
 
-  DynamicQuadTreeNode* GetParent() const { return parent_; }
+  RawPtr GetParent() const { return parent_; }
 
   void GetChildren(const RawPtr& lb_child, const RawPtr& rb_child, const RawPtr& lt_child, const RawPtr& rt_child) const
   {
@@ -173,19 +184,19 @@ public:
     rt_child = rt_child_.get();
   }
 
-  // Attahes specified descendants to the tree
+  // Attahes specified children to the tree
   void CreateChildren(UniPtr lb_child, UniPtr rb_child, UniPtr lt_child, UniPtr rt_child);
-  // Creates descendants UNATTACHED to the tree
+  // Creates children UN-ATTACHED to the tree
   void CreateFloatingChildren(UniPtr& lb_child, UniPtr& rb_child, UniPtr& lt_child, UniPtr& rt_child);
-  // Destroys ALL descendants for the node
+  // Destroys ALL children for the node
   void DestroyChildren();
 
   const QuadTreeNodeLocation& GetLocation() const { return location_; }
 
-  void SetLocation(const QuadTreeNodeLocation& location) { location_ = location; }
+  void SetPos(const QuadTreeNodeLocation& location) { location_ = location; }
 
 private:
-  DynamicQuadTreeNode(RawPtr parent, int birth) : parent_(parent), location_(GetChildLocation(parent->location_, birth)) {}
+  DynamicQuadTreeNode(RawPtr parent, int birth_order) : parent_(parent), location_(GetChildLocation(parent->location_, birth_order)) {}
 
   NodeDataType data_;
 
@@ -212,7 +223,6 @@ void DynamicQuadTreeNode<NodeDataType>::CreateChildren(UniPtr lb_child, UniPtr r
   rt_child_ = rt_child;
 }
 
-
 template <typename NodeDataType>
 void DynamicQuadTreeNode<NodeDataType>::CreateFloatingChildren(UniPtr& lb_child, UniPtr& rb_child, UniPtr& lt_child, UniPtr& rt_child)
 {
@@ -221,7 +231,6 @@ void DynamicQuadTreeNode<NodeDataType>::CreateFloatingChildren(UniPtr& lb_child,
   lt_child.reset(new DynamicQuadTreeNode(this, 2));
   rt_child.reset(new DynamicQuadTreeNode(this, 3));
 }
-
 
 template <typename NodeDataType>
 void DynamicQuadTreeNode<NodeDataType>::DestroyChildren()

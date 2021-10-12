@@ -66,15 +66,15 @@ public:
     return data_[at.level][static_cast<size_t>(at.horz) + (static_cast<size_t>(at.vert) << at.level)];
   }
 
-  void Resize(size_t level_hierarchy)
+  void Resize(size_t num_hierarchy)
   {
-    data_.resize(level_hierarchy);
-    if (level_hierarchy)
+    data_.resize(num_hierarchy);
+    if (num_hierarchy)
     {
-      for (size_t level = level_hierarchy; level--;)
+      for (size_t level = num_hierarchy; level--;)
       {
-        size_t side_size = (size_t)1 << level;
-        data_[level].resize(side_size * side_size);
+        size_t side_number = (size_t)1 << level;
+        data_[level].resize(side_number * side_number);
       }
     }
   }

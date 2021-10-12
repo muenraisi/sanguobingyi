@@ -101,7 +101,7 @@ private:
   HierarchyArray<std::pair<Uint16, Uint16>> min_max_elevation_;
 
   Uint32 patch_size_;              // sub mesh size for tesslation buffer
-  Uint32 num_levels_;              // = log2((num_cols_-1)/path_size))+1
+  Uint32 max_levels_;              // = log2((num_cols_-1)/path_size))+1
   Uint32 col_offset_, row_offset_; //?
 
   // The whole terrain height map

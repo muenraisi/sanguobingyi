@@ -77,9 +77,9 @@ struct RenderingParams
   };
 
   // Patch rendering params
-  TEXTURING_MODE m_TexturingMode = TM_MATERIAL_MASK_NM;
-  int            ring_dim        = 65; // 4K+1
-  int            num_rings       = 15;
+  TEXTURING_MODE m_TexturingMode  = TM_MATERIAL_MASK_NM;
+  int            ring_dim = 65; // 4K+1
+  int            num_rings      = 15;
 
   int            m_iNumShadowCascades         = 6;
   int            m_bBestCascadeSearch         = 1;
@@ -145,7 +145,7 @@ private:
                        IDeviceContext* pd3dImmediateContext,
                        const Uint16*   pHeightMap,
                        size_t          HeightMapPitch,
-                       int             HeightMapDim,
+                       size_t          HeightMapDim,
                        ITexture*       ptex2DNormalMap);
 
   RenderingParams m_Params;

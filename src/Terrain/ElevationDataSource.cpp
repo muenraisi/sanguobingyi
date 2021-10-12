@@ -58,7 +58,7 @@ namespace Diligent
 {
 
 // Creates data source from the specified raw data file
-ElevationDataSource::ElevationDataSource(const Char* src_file) : num_levels_(0), patch_size_(128), col_offset_(0), row_offset_(0)
+ElevationDataSource::ElevationDataSource(const Char* src_file) : max_levels_(0), patch_size_(128), col_offset_(0), row_offset_(0)
 {
 
 #if 1 // read height map from file
@@ -76,8 +76,8 @@ ElevationDataSource::ElevationDataSource(const Char* src_file) : num_levels_(0),
     dim_row_ *= 2;
   }
 
-  num_levels_ = 1;
-  while ((patch_size_ << (num_levels_ - 1)) < dim_col_ || (patch_size_ << (num_levels_ - 1)) < dim_row_) num_levels_++;
+  max_levels_ = 1;
+  while ((patch_size_ << (max_levels_ - 1)) < dim_col_ || (patch_size_ << (max_levels_ - 1)) < dim_row_) max_levels_++;
 
   dim_col_++;
   dim_row_++;
@@ -102,7 +102,7 @@ ElevationDataSource::ElevationDataSource(const Char* src_file) : num_levels_(0),
 #else
   stride_   = 2048;
   num_rows_ = num_cols_ = 2048;
-  num_levels_           = 5;
+  max_levels_           = 5;
   height_map_.resize(num_rows_ * static_cast<size_t>(stride_));
   for (Uint32 j = 0; j < num_rows_; ++j)
   {
@@ -125,7 +125,7 @@ ElevationDataSource::ElevationDataSource(const Char* src_file) : num_levels_(0),
     }
   }
 #endif
-  min_max_elevation_.Resize(num_levels_);
+  min_max_elevation_.Resize(max_levels_);
 
   // Calculate min/max elevations
   CalculateMinMaxElevations();
@@ -203,7 +203,7 @@ float3 ElevationDataSource::ComputeNormal(float col, float row, float pixel_size
 
 void ElevationDataSource::RecomputePatchMinMaxElevations(const QuadTreeNodeLocation& pos)
 {
-  if (pos.level == num_levels_ - 1)
+  if (pos.level == max_levels_ - 1)
   {
     std::pair<Uint16, Uint16>& now_patch_min_max_elev = min_max_elevation_[QuadTreeNodeLocation(pos.horz, pos.vert, pos.level)];
 
@@ -242,7 +242,7 @@ void ElevationDataSource::RecomputePatchMinMaxElevations(const QuadTreeNodeLocat
 void ElevationDataSource::CalculateMinMaxElevations()
 {
   // Calculate min/max elevations starting from the finest level
-  for (HierarchyReverseIterator it(num_levels_); it.IsValid(); it.Next()) { RecomputePatchMinMaxElevations(it); }
+  for (HierarchyReverseIterator it(max_levels_); it.IsValid(); it.Next()) { RecomputePatchMinMaxElevations(it); }
 }
 
 void ElevationDataSource::GetDataPtr(const Uint16*& data_ptr, size_t& stride)
