@@ -71,7 +71,7 @@ void AtmosphereSample::Initialize(const SampleInitInfo& InitInfo)
         m_PPAttribs.iFirstCascadeToRayMarch                = 2;
         m_PPAttribs.iSingleScatteringMode                  = SINGLE_SCTR_MODE_LUT;
         m_TerrainRenderParams.m_iNumShadowCascades         = 4;
-        m_TerrainRenderParams.m_iNumRings                  = 10;
+        m_TerrainRenderParams.num_rings                  = 10;
         m_TerrainRenderParams.m_TexturingMode              = RenderingParams::TM_MATERIAL_MASK;
     }
 

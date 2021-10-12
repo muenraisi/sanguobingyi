@@ -248,7 +248,7 @@ public:
         StdTriStrip32       TriStrip(IB, StdIndexGenerator(m_iGridDimenion));
         TriStrip.AddStrip(iBaseIndex, iStartCol, iStartRow, iNumCols, iNumRows, QuadTriangType);
 
-        CurrMesh.uiNumIndices = (Uint32)IB.size();
+        CurrMesh.num_indices = (Uint32)IB.size();
 
         // Prepare buffer description
         BufferDesc IndexBufferDesc;
@@ -260,11 +260,11 @@ public:
         IBInitData.pData    = IB.data();
         IBInitData.DataSize = IndexBufferDesc.Size;
         // Create the buffer
-        m_pDevice->CreateBuffer(IndexBufferDesc, &IBInitData, &CurrMesh.pIndBuff);
-        VERIFY(CurrMesh.pIndBuff, "Failed to create index buffer");
+        m_pDevice->CreateBuffer(IndexBufferDesc, &IBInitData, &CurrMesh.index_buffer);
+        VERIFY(CurrMesh.index_buffer, "Failed to create index buffer");
 
         // Compute bounding box
-        auto& BB = CurrMesh.BndBox;
+        auto& BB = CurrMesh.bound_box;
         BB.Max   = float3(-FLT_MAX, -FLT_MAX, -FLT_MAX);
         BB.Min   = float3(+FLT_MAX, +FLT_MAX, +FLT_MAX);
         for (auto Ind = IB.begin(); Ind != IB.end(); ++Ind)
@@ -296,7 +296,7 @@ void GenerateSphereGeometry(IRenderDevice*                 pDevice,
 {
     if ((iGridDimension - 1) % 4 != 0)
     {
-        iGridDimension = RenderingParams().m_iRingDimension;
+        iGridDimension = RenderingParams().ring_dim;
         UNEXPECTED("Grid dimension must be 4k+1. Defaulting to ", iGridDimension);
     }
     const int iGridMidst = (iGridDimension - 1) / 2;
@@ -556,7 +556,7 @@ void EarthHemsiphere::RenderNormalMap(IRenderDevice*  pDevice,
 
 
     RefCntAutoPtr<IShaderSourceInputStreamFactory> pShaderSourceFactory;
-    m_pDevice->GetEngineFactory()->CreateDefaultShaderSourceStreamFactory("shaders\\;shaders\\terrain", &pShaderSourceFactory);
+    device_->GetEngineFactory()->CreateDefaultShaderSourceStreamFactory("shaders\\;shaders\\terrain", &pShaderSourceFactory);
 
     ShaderCreateInfo ShaderCI;
     ShaderCI.pShaderSourceStreamFactory = pShaderSourceFactory;
@@ -655,7 +655,7 @@ void EarthHemsiphere::Create(class ElevationDataSource* pDataSource,
                              IBuffer*                   pcMediaScatteringParams)
 {
     m_Params  = Params;
-    m_pDevice = pDevice;
+    device_ = pDevice;
 
     const Uint16* pHeightMap;
     size_t        HeightMapPitch;
@@ -722,12 +722,12 @@ void EarthHemsiphere::Create(class ElevationDataSource* pDataSource,
     m_pResMapping->AddResourceArray("g_tex2DTileDiffuse", 0, ptex2DTileDiffuseSRV, NUM_TILE_TEXTURES, true);
     m_pResMapping->AddResourceArray("g_tex2DTileNM", 0, ptex2DTileNMSRV, NUM_TILE_TEXTURES, true);
 
-    m_pDevice->CreateSampler(Sam_ComparsionLinearClamp, &m_pComparisonSampler);
+    device_->CreateSampler(Sam_ComparsionLinearClamp, &m_pComparisonSampler);
 
     RenderNormalMap(pDevice, pContext, pHeightMap, HeightMapPitch, iHeightMapDim, ptex2DNormalMap);
 
     RefCntAutoPtr<IShaderSourceInputStreamFactory> pShaderSourceFactory;
-    m_pDevice->GetEngineFactory()->CreateDefaultShaderSourceStreamFactory("shaders;shaders\\terrain;", &pShaderSourceFactory);
+    device_->GetEngineFactory()->CreateDefaultShaderSourceStreamFactory("shaders;shaders\\terrain;", &pShaderSourceFactory);
 
     {
         ShaderCreateInfo ShaderCI;
@@ -783,7 +783,7 @@ void EarthHemsiphere::Create(class ElevationDataSource* pDataSource,
     }
 
     std::vector<HemisphereVertex> VB;
-    GenerateSphereGeometry(pDevice, Diligent::AirScatteringAttribs().fEarthRadius, m_Params.m_iRingDimension, m_Params.m_iNumRings, pDataSource, m_Params.m_TerrainAttribs.m_fElevationSamplingInterval, m_Params.m_TerrainAttribs.m_fElevationScale, VB, m_SphereMeshes);
+    GenerateSphereGeometry(pDevice, Diligent::AirScatteringAttribs().fEarthRadius, m_Params.ring_dim, m_Params.num_rings, pDataSource, m_Params.m_TerrainAttribs.m_fElevationSamplingInterval, m_Params.m_TerrainAttribs.m_fElevationScale, VB, m_SphereMeshes);
 
     BufferDesc VBDesc;
     VBDesc.Name      = "Hemisphere vertex buffer";
@@ -835,7 +835,7 @@ void EarthHemsiphere::Render(IDeviceContext*        pContext,
         Attrs.UseCombinedTextureSamplers = true;
         Attrs.SourceLanguage             = SHADER_SOURCE_LANGUAGE_HLSL;
         RefCntAutoPtr<IShaderSourceInputStreamFactory> pShaderSourceFactory;
-        m_pDevice->GetEngineFactory()->CreateDefaultShaderSourceStreamFactory("shaders;shaders\\terrain;", &pShaderSourceFactory);
+        device_->GetEngineFactory()->CreateDefaultShaderSourceStreamFactory("shaders;shaders\\terrain;", &pShaderSourceFactory);
         Attrs.pShaderSourceStreamFactory = pShaderSourceFactory;
 
         std::array<ImmutableSamplerDesc, 5> ImtblSamplers = {};
@@ -878,7 +878,7 @@ void EarthHemsiphere::Render(IDeviceContext*        pContext,
         Attrs.Macros = Macros;
 
         RefCntAutoPtr<IShader> pHemispherePS;
-        m_pDevice->CreateShader(Attrs, &pHemispherePS);
+        device_->CreateShader(Attrs, &pHemispherePS);
 
         LayoutElement Inputs[] =
             {
@@ -920,7 +920,7 @@ void EarthHemsiphere::Render(IDeviceContext*        pContext,
         GraphicsPipeline.NumRenderTargets                     = 1;
         GraphicsPipeline.DSVFormat                            = TEX_FORMAT_D32_FLOAT;
         GraphicsPipeline.PrimitiveTopology                    = PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP;
-        m_pDevice->CreateGraphicsPipelineState(PSOCreateInfo, &m_pHemispherePSO);
+        device_->CreateGraphicsPipelineState(PSOCreateInfo, &m_pHemispherePSO);
         m_pHemispherePSO->BindStaticResources(SHADER_TYPE_VERTEX | SHADER_TYPE_PIXEL, m_pResMapping, BIND_SHADER_RESOURCES_VERIFY_ALL_RESOLVED);
         m_pHemispherePSO->CreateShaderResourceBinding(&m_pHemisphereSRB, true);
         m_pHemisphereSRB->BindResources(SHADER_TYPE_VERTEX, m_pResMapping, BIND_SHADER_RESOURCES_KEEP_EXISTING);
@@ -928,7 +928,7 @@ void EarthHemsiphere::Render(IDeviceContext*        pContext,
 
 
     ViewFrustumExt ViewFrustum;
-    auto           DevType = m_pDevice->GetDeviceInfo().Type;
+    auto           DevType = device_->GetDeviceInfo().Type;
     ExtractViewFrustumPlanesFromMatrix(CameraViewProjMatrix, ViewFrustum, DevType == RENDER_DEVICE_TYPE_D3D11 || DevType == RENDER_DEVICE_TYPE_D3D12);
 
     {
@@ -980,10 +980,10 @@ void EarthHemsiphere::Render(IDeviceContext*        pContext,
 
     for (auto MeshIt = m_SphereMeshes.begin(); MeshIt != m_SphereMeshes.end(); ++MeshIt)
     {
-        if (GetBoxVisibility(ViewFrustum, MeshIt->BndBox, bZOnlyPass ? FRUSTUM_PLANE_FLAG_OPEN_NEAR : FRUSTUM_PLANE_FLAG_FULL_FRUSTUM) != BoxVisibility::Invisible)
+        if (GetBoxVisibility(ViewFrustum, MeshIt->bound_box, bZOnlyPass ? FRUSTUM_PLANE_FLAG_OPEN_NEAR : FRUSTUM_PLANE_FLAG_FULL_FRUSTUM) != BoxVisibility::Invisible)
         {
-            pContext->SetIndexBuffer(MeshIt->pIndBuff, 0, RESOURCE_STATE_TRANSITION_MODE_TRANSITION);
-            DrawIndexedAttribs DrawAttrs(MeshIt->uiNumIndices, VT_UINT32, DRAW_FLAG_VERIFY_ALL);
+            pContext->SetIndexBuffer(MeshIt->index_buffer, 0, RESOURCE_STATE_TRANSITION_MODE_TRANSITION);
+            DrawIndexedAttribs DrawAttrs(MeshIt->num_indices, VT_UINT32, DRAW_FLAG_VERIFY_ALL);
             pContext->DrawIndexed(DrawAttrs);
         }
     }
