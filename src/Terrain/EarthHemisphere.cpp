@@ -268,7 +268,7 @@ private:
 };
 
 template <typename IndexType>
-void GenerateSphereGeometry(IRenderDevice*                 pDevice,
+void GenerateSphereGeometry(IRenderDevice*                 device,
                             const float                    earth_radius,
                             IndexType                      grid_dim, // grid dimension
                             const size_t                   num_rings,
@@ -287,7 +287,7 @@ void GenerateSphereGeometry(IRenderDevice*                 pDevice,
   const IndexType           grid_midst = (grid_dim - 1) / 2;
   const IndexType           grid_quart = (grid_dim - 1) / 4;
   StdIndexGenerator<Uint32> std_index_generator(grid_dim);
-  RingMeshBuilder<Uint32>   ring_mesh_builder(pDevice, vert_buff, grid_dim, sphere_meshes);
+  RingMeshBuilder<Uint32>   ring_mesh_builder(device, vert_buff, grid_dim, sphere_meshes);
 
   size_t start_ring = 0;
   vert_buff.reserve(num_rings  * grid_dim * grid_dim);
