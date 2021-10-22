@@ -159,7 +159,7 @@ private:
   RefCntAutoPtr<ITextureView> m_ptex2DTilesSRV[NUM_TILE_TEXTURES];
   RefCntAutoPtr<ITextureView> m_ptex2DTilNormalMapsSRV[NUM_TILE_TEXTURES];
 
-  RefCntAutoPtr<IResourceMapping> m_pResMapping;
+  RefCntAutoPtr<IResourceMapping> resource_mapping_;
   RefCntAutoPtr<IShader>          m_pHemisphereVS;
 
   RefCntAutoPtr<IPipelineState>         m_pHemisphereZOnlyPSO;

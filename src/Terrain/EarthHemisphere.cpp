@@ -476,155 +476,153 @@ void GenerateSphereGeometry(IRenderDevice*                 device,
 #endif
 }
 
-void EarthHemsiphere::RenderNormalMap(IRenderDevice*  pDevice,
-                                      IDeviceContext* pContext,
-                                      const Uint16*   pHeightMap,
-                                      size_t          HeightMapPitch,
-                                      size_t          iHeightMapDim,
+void EarthHemsiphere::RenderNormalMap(IRenderDevice*  device,
+                                      IDeviceContext* context,
+                                      const Uint16*   height_map_data,
+                                      size_t          height_map_pitch,
+                                      size_t          height_map_dim,
                                       ITexture*       ptex2DNormalMap)
 {
-  TextureDesc HeightMapDesc;
-  HeightMapDesc.Name      = "Height map texture";
-  HeightMapDesc.Type      = RESOURCE_DIM_TEX_2D;
-  HeightMapDesc.Width     = iHeightMapDim;
-  HeightMapDesc.Height    = iHeightMapDim;
-  HeightMapDesc.Format    = TEX_FORMAT_R16_UINT;
-  HeightMapDesc.Usage     = USAGE_IMMUTABLE;
-  HeightMapDesc.BindFlags = BIND_SHADER_RESOURCE;
-  HeightMapDesc.MipLevels = ComputeMipLevelsCount(HeightMapDesc.Width, HeightMapDesc.Height);
+  TextureDesc height_map_desc;
+  height_map_desc.Name      = "Height map texture";
+  height_map_desc.Type      = RESOURCE_DIM_TEX_2D;
+  height_map_desc.Width     = height_map_dim;
+  height_map_desc.Height    = height_map_dim;
+  height_map_desc.Format    = TEX_FORMAT_R16_UINT;
+  height_map_desc.Usage     = USAGE_IMMUTABLE;
+  height_map_desc.BindFlags = BIND_SHADER_RESOURCE;
+  height_map_desc.MipLevels = ComputeMipLevelsCount(height_map_desc.Width, height_map_desc.Height);
 
-  std::vector<Uint16> CoarseMipLevels;
-  CoarseMipLevels.resize(iHeightMapDim / 2 * iHeightMapDim);
+  std::vector<Uint16> coarse_mip_levels;
+  coarse_mip_levels.resize(height_map_dim / 2 * height_map_dim);
 
-  std::vector<TextureSubResData> InitData(HeightMapDesc.MipLevels);
-  InitData[0].pData            = pHeightMap;
-  InitData[0].Stride           = (Uint32)HeightMapPitch * sizeof(pHeightMap[0]);
-  const Uint16* pFinerMipLevel = pHeightMap;
-  Uint16*       pCurrMipLevel  = &CoarseMipLevels[0];
-  size_t        FinerMipPitch  = HeightMapPitch;
-  size_t        CurrMipPitch   = iHeightMapDim / 2;
-  for (size_t uiMipLevel = 1; uiMipLevel < HeightMapDesc.MipLevels; ++uiMipLevel)
+  std::vector<TextureSubResData> mip_map_data(height_map_desc.MipLevels);
+  mip_map_data[0].pData            = height_map_data;
+  mip_map_data[0].Stride           = (Uint32)height_map_pitch * sizeof(height_map_data[0]);
+  const Uint16* finer_mip_data = height_map_data;
+  Uint16*       now_mip_data  = &coarse_mip_levels[0];
+  size_t        FinerMipPitch  = height_map_pitch;
+  size_t        now_mip_pitch   = height_map_dim / 2;//All mip levels are stacked on top of each other with the same stride
+  for (size_t mip_level = 1; mip_level < height_map_desc.MipLevels; ++mip_level)
   {
-    auto MipWidth  = HeightMapDesc.Width >> uiMipLevel;
-    auto MipHeight = HeightMapDesc.Height >> uiMipLevel;
-    for (size_t uiRow = 0; uiRow < MipHeight; ++uiRow)
+    auto mip_width  = height_map_desc.Width >> mip_level;
+    auto mip_height = height_map_desc.Height >> mip_level;
+    for (size_t row = 0; row < mip_height; ++row)
     {
-      for (size_t uiCol = 0; uiCol < MipWidth; ++uiCol)
+      for (size_t col = 0; col < mip_width; ++col)
       {
-        int iAverageHeight = 0;
+        int average_height = 0;
         for (size_t i = 0; i < 2; ++i)
-          for (size_t j = 0; j < 2; ++j) iAverageHeight += pFinerMipLevel[(uiCol * 2 + i) + (uiRow * 2 + j) * size_t{FinerMipPitch}];
-        pCurrMipLevel[uiCol + uiRow * CurrMipPitch] = (Uint16)(iAverageHeight >> 2);
+          for (size_t j = 0; j < 2; ++j) average_height += finer_mip_data[(col * 2 + i) + (row * 2 + j) * size_t{FinerMipPitch}];
+        now_mip_data[col + row * now_mip_pitch] = (Uint16)(average_height >> 2);
       }
     }
 
-    InitData[uiMipLevel].pData  = pCurrMipLevel;
-    InitData[uiMipLevel].Stride = (Uint32)CurrMipPitch * sizeof(*pCurrMipLevel);
-    pFinerMipLevel              = pCurrMipLevel;
-    FinerMipPitch               = CurrMipPitch;
-    pCurrMipLevel += MipHeight * CurrMipPitch;
-    CurrMipPitch = iHeightMapDim / 2;
+    mip_map_data[mip_level].pData  = now_mip_data;
+    mip_map_data[mip_level].Stride = (Uint32)now_mip_pitch * sizeof(*now_mip_data);
+    finer_mip_data              = now_mip_data;
+    FinerMipPitch               = now_mip_pitch;
+    now_mip_data += mip_height * now_mip_pitch;
+    now_mip_pitch = height_map_dim / 2;
   }
 
-  RefCntAutoPtr<ITexture> ptex2DHeightMap;
-  TextureData             HeigtMapInitData;
-  HeigtMapInitData.pSubResources   = InitData.data();
-  HeigtMapInitData.NumSubresources = (Uint32)InitData.size();
-  pDevice->CreateTexture(HeightMapDesc, &HeigtMapInitData, &ptex2DHeightMap);
-  VERIFY(ptex2DHeightMap, "Failed to create height map texture");
+  RefCntAutoPtr<ITexture> height_map_texture;
+  TextureData             height_map_texture_data;
+  height_map_texture_data.pSubResources   = mip_map_data.data();
+  height_map_texture_data.NumSubresources = (Uint32)mip_map_data.size();
+  device->CreateTexture(height_map_desc, &height_map_texture_data, &height_map_texture);
+  VERIFY(height_map_texture, "Failed to create height map texture");
 
-  m_pResMapping->AddResource("g_tex2DElevationMap", ptex2DHeightMap->GetDefaultView(TEXTURE_VIEW_SHADER_RESOURCE), true);
+  resource_mapping_->AddResource("g_tex2DElevationMap", height_map_texture->GetDefaultView(TEXTURE_VIEW_SHADER_RESOURCE), true);
 
-  RefCntAutoPtr<IBuffer> pcbNMGenerationAttribs;
-  CreateUniformBuffer(pDevice, sizeof(NMGenerationAttribs), "NM Generation Attribs CB", &pcbNMGenerationAttribs);
+  RefCntAutoPtr<IBuffer> normal_generation_attribs_buffer;
+  CreateUniformBuffer(device, sizeof(NMGenerationAttribs), "NM Generation Attribs CB", &normal_generation_attribs_buffer);//NM(normal)
 
-  m_pResMapping->AddResource("cbNMGenerationAttribs", pcbNMGenerationAttribs, true);
+  resource_mapping_->AddResource("cbNMGenerationAttribs", normal_generation_attribs_buffer, true);
 
-  RefCntAutoPtr<IShaderSourceInputStreamFactory> pShaderSourceFactory;
-  device_->GetEngineFactory()->CreateDefaultShaderSourceStreamFactory("shaders\\;shaders\\terrain", &pShaderSourceFactory);
+  RefCntAutoPtr<IShaderSourceInputStreamFactory> shader_source_factory;
+  device_->GetEngineFactory()->CreateDefaultShaderSourceStreamFactory("shaders\\;shaders\\terrain", &shader_source_factory);
 
-  ShaderCreateInfo ShaderCI;
-  ShaderCI.pShaderSourceStreamFactory = pShaderSourceFactory;
-  ShaderCI.FilePath                   = "ScreenSizeQuadVS.fx";
-  ShaderCI.EntryPoint                 = "GenerateScreenSizeQuadVS";
-  ShaderCI.SourceLanguage             = SHADER_SOURCE_LANGUAGE_HLSL;
-  ShaderCI.UseCombinedTextureSamplers = true;
-  ShaderCI.Desc.ShaderType            = SHADER_TYPE_VERTEX;
-  ShaderCI.Desc.Name                  = "GenerateScreenSizeQuadVS";
-  RefCntAutoPtr<IShader> pScreenSizeQuadVS;
-  pDevice->CreateShader(ShaderCI, &pScreenSizeQuadVS);
+  ShaderCreateInfo shader_cretae_info;
+  shader_cretae_info.pShaderSourceStreamFactory = shader_source_factory;
+  shader_cretae_info.FilePath                   = "ScreenSizeQuadVS.fx";
+  shader_cretae_info.EntryPoint                 = "GenerateScreenSizeQuadVS";
+  shader_cretae_info.SourceLanguage             = SHADER_SOURCE_LANGUAGE_HLSL;
+  shader_cretae_info.UseCombinedTextureSamplers = true;
+  shader_cretae_info.Desc.ShaderType            = SHADER_TYPE_VERTEX;
+  shader_cretae_info.Desc.Name                  = "GenerateScreenSizeQuadVS";
+  RefCntAutoPtr<IShader> screen_size_quad_vs;
+  device->CreateShader(shader_cretae_info, &screen_size_quad_vs);
 
-  ShaderCI.FilePath        = "GenerateNormalMapPS.fx";
-  ShaderCI.EntryPoint      = "GenerateNormalMapPS";
-  ShaderCI.Desc.ShaderType = SHADER_TYPE_PIXEL;
-  ShaderCI.Desc.Name       = "GenerateNormalMapPS";
+  shader_cretae_info.FilePath        = "GenerateNormalMapPS.fx";
+  shader_cretae_info.EntryPoint      = "GenerateNormalMapPS";
+  shader_cretae_info.Desc.ShaderType = SHADER_TYPE_PIXEL;
+  shader_cretae_info.Desc.Name       = "GenerateNormalMapPS";
 
-  RefCntAutoPtr<IShader> pGenerateNormalMapPS;
-  pDevice->CreateShader(ShaderCI, &pGenerateNormalMapPS);
+  RefCntAutoPtr<IShader> generate_normal_map_ps;
+  device->CreateShader(shader_cretae_info, &generate_normal_map_ps);
 
-  GraphicsPipelineStateCreateInfo PSOCreateInfo;
-  PipelineStateDesc&              PSODesc = PSOCreateInfo.PSODesc;
+  GraphicsPipelineStateCreateInfo pso_create_info;
+  pso_create_info.pVS = screen_size_quad_vs;
+  pso_create_info.pPS = generate_normal_map_ps;
 
-  PSODesc.ResourceLayout.DefaultVariableType = SHADER_RESOURCE_VARIABLE_TYPE_STATIC;
+  PipelineStateDesc&              pso_desc = pso_create_info.PSODesc;
+  pso_desc.ResourceLayout.DefaultVariableType = SHADER_RESOURCE_VARIABLE_TYPE_STATIC;
   // clang-format off
-    ShaderResourceVariableDesc ShaderVars[] = 
-    {
-        {SHADER_TYPE_PIXEL, "g_tex2DElevationMap",   SHADER_RESOURCE_VARIABLE_TYPE_STATIC},
-        {SHADER_TYPE_PIXEL, "cbNMGenerationAttribs", SHADER_RESOURCE_VARIABLE_TYPE_STATIC}
-    };
-  // clang-format on
-
-  PSODesc.ResourceLayout.NumVariables = _countof(ShaderVars);
-  PSODesc.ResourceLayout.Variables    = ShaderVars;
-
-  PSODesc.Name           = "Render Normal Map";
-  auto& GraphicsPipeline = PSOCreateInfo.GraphicsPipeline;
-
-  GraphicsPipeline.DepthStencilDesc.DepthEnable         = false;
-  GraphicsPipeline.DepthStencilDesc.DepthWriteEnable    = false;
-  GraphicsPipeline.RasterizerDesc.FillMode              = FILL_MODE_SOLID;
-  GraphicsPipeline.RasterizerDesc.CullMode              = CULL_MODE_NONE;
-  GraphicsPipeline.RasterizerDesc.FrontCounterClockwise = true;
-  PSOCreateInfo.pVS                                     = pScreenSizeQuadVS;
-  PSOCreateInfo.pPS                                     = pGenerateNormalMapPS;
-  GraphicsPipeline.NumRenderTargets                     = 1;
-  GraphicsPipeline.RTVFormats[0]                        = TEX_FORMAT_RG8_UNORM;
-  GraphicsPipeline.PrimitiveTopology                    = PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP;
-  RefCntAutoPtr<IPipelineState> pRenderNormalMapPSO;
-  pDevice->CreateGraphicsPipelineState(PSOCreateInfo, &pRenderNormalMapPSO);
-  pRenderNormalMapPSO->BindStaticResources(SHADER_TYPE_VERTEX | SHADER_TYPE_PIXEL, m_pResMapping, BIND_SHADER_RESOURCES_VERIFY_ALL_RESOLVED);
-
-  RefCntAutoPtr<IShaderResourceBinding> pRenderNormalMapSRB;
-  pRenderNormalMapPSO->CreateShaderResourceBinding(&pRenderNormalMapSRB, true);
-
-  pContext->SetPipelineState(pRenderNormalMapPSO);
-  pContext->CommitShaderResources(pRenderNormalMapSRB, RESOURCE_STATE_TRANSITION_MODE_TRANSITION);
-
-  const auto& NormalMapDesc = ptex2DNormalMap->GetDesc();
-  for (Uint32 uiMipLevel = 0; uiMipLevel < NormalMapDesc.MipLevels; ++uiMipLevel)
+  ShaderResourceVariableDesc shader_vars[] = 
   {
-    TextureViewDesc TexViewDesc;
-    TexViewDesc.ViewType        = TEXTURE_VIEW_RENDER_TARGET;
-    TexViewDesc.MostDetailedMip = uiMipLevel;
-    RefCntAutoPtr<ITextureView> ptex2DNormalMapRTV;
-    ptex2DNormalMap->CreateView(TexViewDesc, &ptex2DNormalMapRTV);
+    {SHADER_TYPE_PIXEL, "g_tex2DElevationMap",   SHADER_RESOURCE_VARIABLE_TYPE_STATIC},
+    {SHADER_TYPE_PIXEL, "cbNMGenerationAttribs", SHADER_RESOURCE_VARIABLE_TYPE_STATIC}
+  };
+  // clang-format on
+  pso_desc.ResourceLayout.NumVariables = _countof(shader_vars);
+  pso_desc.ResourceLayout.Variables    = shader_vars;
+  pso_desc.Name           = "Render Normal Map";
 
-    ITextureView* pRTVs[] = {ptex2DNormalMapRTV};
-    pContext->SetRenderTargets(_countof(pRTVs), pRTVs, nullptr, RESOURCE_STATE_TRANSITION_MODE_TRANSITION);
+  GraphicsPipelineDesc& graphics_pipline_desc = pso_create_info.GraphicsPipeline;
+  graphics_pipline_desc.DepthStencilDesc.DepthEnable         = false;
+  graphics_pipline_desc.DepthStencilDesc.DepthWriteEnable    = false;
+  graphics_pipline_desc.RasterizerDesc.FillMode              = FILL_MODE_SOLID;
+  graphics_pipline_desc.RasterizerDesc.CullMode              = CULL_MODE_NONE;
+  graphics_pipline_desc.RasterizerDesc.FrontCounterClockwise = true;
+  graphics_pipline_desc.NumRenderTargets                     = 1;
+  graphics_pipline_desc.RTVFormats[0]                        = TEX_FORMAT_RG8_UNORM;
+  graphics_pipline_desc.PrimitiveTopology                    = PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP;
+  RefCntAutoPtr<IPipelineState> render_normal_map_pso;
+  device->CreateGraphicsPipelineState(pso_create_info, &render_normal_map_pso);
+  render_normal_map_pso->BindStaticResources(SHADER_TYPE_VERTEX | SHADER_TYPE_PIXEL, resource_mapping_, BIND_SHADER_RESOURCES_VERIFY_ALL_RESOLVED);
+
+  RefCntAutoPtr<IShaderResourceBinding> render_normal_map_srb;
+  render_normal_map_pso->CreateShaderResourceBinding(&render_normal_map_srb, true);
+
+  context->SetPipelineState(render_normal_map_pso);
+  context->CommitShaderResources(render_normal_map_srb, RESOURCE_STATE_TRANSITION_MODE_TRANSITION);
+
+  const auto& normal_map_desc = ptex2DNormalMap->GetDesc();
+  for (Uint32 mip_level = 0; mip_level < normal_map_desc.MipLevels; ++mip_level)
+  {
+    TextureViewDesc texture_view_desc;
+    texture_view_desc.ViewType        = TEXTURE_VIEW_RENDER_TARGET;
+    texture_view_desc.MostDetailedMip = mip_level;
+    RefCntAutoPtr<ITextureView> normal_map_rtv;
+    ptex2DNormalMap->CreateView(texture_view_desc, &normal_map_rtv);
+
+    ITextureView* rtv_array[] = {normal_map_rtv};
+    context->SetRenderTargets(_countof(rtv_array), rtv_array, nullptr, RESOURCE_STATE_TRANSITION_MODE_TRANSITION);
 
     {
-      MapHelper<NMGenerationAttribs> NMGenerationAttribs(pContext, pcbNMGenerationAttribs, MAP_WRITE, MAP_FLAG_DISCARD);
+      MapHelper<NMGenerationAttribs> NMGenerationAttribs(context, normal_generation_attribs_buffer, MAP_WRITE, MAP_FLAG_DISCARD);
       NMGenerationAttribs->m_fElevationScale        = m_Params.m_TerrainAttribs.m_fElevationScale;
       NMGenerationAttribs->m_fSampleSpacingInterval = m_Params.m_TerrainAttribs.m_fElevationSamplingInterval;
-      NMGenerationAttribs->m_iMIPLevel              = static_cast<int>(uiMipLevel);
+      NMGenerationAttribs->m_iMIPLevel              = static_cast<int>(mip_level);
     }
 
-    DrawAttribs DrawAttrs(4, DRAW_FLAG_VERIFY_ALL);
-    pContext->Draw(DrawAttrs);
+    DrawAttribs draw_attrs(4, DRAW_FLAG_VERIFY_ALL);
+    context->Draw(draw_attrs);
   }
 
   // Remove elevation map from resource mapping to release the resource
-  m_pResMapping->RemoveResourceByName("g_tex2DElevationMap");
+  resource_mapping_->RemoveResourceByName("g_tex2DElevationMap");
 }
 
 void EarthHemsiphere::Create(class ElevationDataSource* pDataSource,
@@ -676,12 +674,12 @@ void EarthHemsiphere::Create(class ElevationDataSource* pDataSource,
     };
   // clang-format on
   ResMappingDesc.pEntries = pEntries;
-  pDevice->CreateResourceMapping(ResMappingDesc, &m_pResMapping);
+  pDevice->CreateResourceMapping(ResMappingDesc, &resource_mapping_);
 
   RefCntAutoPtr<ITexture> ptex2DMtrlMask;
   CreateTextureFromFile(MaterialMaskPath, TextureLoadInfo(), pDevice, &ptex2DMtrlMask);
   auto ptex2DMtrlMaskSRV = ptex2DMtrlMask->GetDefaultView(TEXTURE_VIEW_SHADER_RESOURCE);
-  m_pResMapping->AddResource("g_tex2DMtrlMap", ptex2DMtrlMaskSRV, true);
+  resource_mapping_->AddResource("g_tex2DMtrlMap", ptex2DMtrlMaskSRV, true);
 
   // Load tiles
   IDeviceObject*          ptex2DTileDiffuseSRV[NUM_TILE_TEXTURES] = {};
@@ -702,8 +700,8 @@ void EarthHemsiphere::Create(class ElevationDataSource* pDataSource,
       ptex2DTileNMSRV[iTileTex] = ptex2DTileNM[iTileTex]->GetDefaultView(TEXTURE_VIEW_SHADER_RESOURCE);
     }
   }
-  m_pResMapping->AddResourceArray("g_tex2DTileDiffuse", 0, ptex2DTileDiffuseSRV, NUM_TILE_TEXTURES, true);
-  m_pResMapping->AddResourceArray("g_tex2DTileNM", 0, ptex2DTileNMSRV, NUM_TILE_TEXTURES, true);
+  resource_mapping_->AddResourceArray("g_tex2DTileDiffuse", 0, ptex2DTileDiffuseSRV, NUM_TILE_TEXTURES, true);
+  resource_mapping_->AddResourceArray("g_tex2DTileNM", 0, ptex2DTileNMSRV, NUM_TILE_TEXTURES, true);
 
   device_->CreateSampler(Sam_ComparsionLinearClamp, &m_pComparisonSampler);
 
@@ -760,7 +758,7 @@ void EarthHemsiphere::Create(class ElevationDataSource* pDataSource,
     GraphicsPipeline.PrimitiveTopology          = PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP;
     PSOCreateInfo.pVS                           = pHemisphereZOnlyVS;
     pDevice->CreateGraphicsPipelineState(PSOCreateInfo, &m_pHemisphereZOnlyPSO);
-    m_pHemisphereZOnlyPSO->BindStaticResources(SHADER_TYPE_VERTEX | SHADER_TYPE_PIXEL, m_pResMapping, BIND_SHADER_RESOURCES_VERIFY_ALL_RESOLVED);
+    m_pHemisphereZOnlyPSO->BindStaticResources(SHADER_TYPE_VERTEX | SHADER_TYPE_PIXEL, resource_mapping_, BIND_SHADER_RESOURCES_VERIFY_ALL_RESOLVED);
     m_pHemisphereZOnlyPSO->CreateShaderResourceBinding(&m_pHemisphereZOnlySRB, true);
   }
 
@@ -897,9 +895,9 @@ void EarthHemsiphere::Render(IDeviceContext*        pContext,
     GraphicsPipeline.DSVFormat                            = TEX_FORMAT_D32_FLOAT;
     GraphicsPipeline.PrimitiveTopology                    = PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP;
     device_->CreateGraphicsPipelineState(PSOCreateInfo, &m_pHemispherePSO);
-    m_pHemispherePSO->BindStaticResources(SHADER_TYPE_VERTEX | SHADER_TYPE_PIXEL, m_pResMapping, BIND_SHADER_RESOURCES_VERIFY_ALL_RESOLVED);
+    m_pHemispherePSO->BindStaticResources(SHADER_TYPE_VERTEX | SHADER_TYPE_PIXEL, resource_mapping_, BIND_SHADER_RESOURCES_VERIFY_ALL_RESOLVED);
     m_pHemispherePSO->CreateShaderResourceBinding(&m_pHemisphereSRB, true);
-    m_pHemisphereSRB->BindResources(SHADER_TYPE_VERTEX, m_pResMapping, BIND_SHADER_RESOURCES_KEEP_EXISTING);
+    m_pHemisphereSRB->BindResources(SHADER_TYPE_VERTEX, resource_mapping_, BIND_SHADER_RESOURCES_KEEP_EXISTING);
   }
 
   ViewFrustumExt ViewFrustum;
