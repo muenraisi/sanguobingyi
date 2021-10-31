@@ -111,9 +111,9 @@ void AtmosphereSample::Initialize(const SampleInitInfo& InitInfo)
     m_pElevDataSource.reset(new ElevationDataSource(m_strRawDEMDataFile.c_str()));
     m_pElevDataSource->SetOffsets(m_TerrainRenderParams.m_iColOffset, m_TerrainRenderParams.m_iRowOffset);
     m_fMinElevation =
-      m_pElevDataSource->GetGlobalMinElevation() * m_TerrainRenderParams.m_TerrainAttribs.m_fElevationScale;
+      m_pElevDataSource->GetGlobalMinElevation() * m_TerrainRenderParams.m_TerrainAttribs.height_scale;
     m_fMaxElevation =
-      m_pElevDataSource->GetGlobalMaxElevation() * m_TerrainRenderParams.m_TerrainAttribs.m_fElevationScale;
+      m_pElevDataSource->GetGlobalMaxElevation() * m_TerrainRenderParams.m_TerrainAttribs.height_scale;
   }
   catch (const std::exception&)
   {

@@ -535,10 +535,10 @@ void EarthHemsiphere::RenderNormalMap(IRenderDevice*  device,
 
   resource_mapping_->AddResource("g_tex2DElevationMap", height_map_texture->GetDefaultView(TEXTURE_VIEW_SHADER_RESOURCE), true);
 
-  RefCntAutoPtr<IBuffer> normal_generation_attribs_buffer;
-  CreateUniformBuffer(device, sizeof(NMGenerationAttribs), "NM Generation Attribs CB", &normal_generation_attribs_buffer);//NM(normal)
+  RefCntAutoPtr<IBuffer> normal_generation_attribs_cbuffer;
+  CreateUniformBuffer(device, sizeof(NMGenerationAttribs), "NM Generation Attribs CB", &normal_generation_attribs_cbuffer);//NM(normal)
 
-  resource_mapping_->AddResource("cbNMGenerationAttribs", normal_generation_attribs_buffer, true);
+  resource_mapping_->AddResource("cbNMGenerationAttribs", normal_generation_attribs_cbuffer, true);
 
   RefCntAutoPtr<IShaderSourceInputStreamFactory> shader_source_factory;
   device_->GetEngineFactory()->CreateDefaultShaderSourceStreamFactory("shaders\\;shaders\\terrain", &shader_source_factory);
@@ -611,10 +611,10 @@ void EarthHemsiphere::RenderNormalMap(IRenderDevice*  device,
     context->SetRenderTargets(_countof(rtv_array), rtv_array, nullptr, RESOURCE_STATE_TRANSITION_MODE_TRANSITION);
 
     {
-      MapHelper<NMGenerationAttribs> NMGenerationAttribs(context, normal_generation_attribs_buffer, MAP_WRITE, MAP_FLAG_DISCARD);
-      NMGenerationAttribs->m_fElevationScale        = m_Params.m_TerrainAttribs.m_fElevationScale;
-      NMGenerationAttribs->m_fSampleSpacingInterval = m_Params.m_TerrainAttribs.m_fElevationSamplingInterval;
-      NMGenerationAttribs->m_iMIPLevel              = static_cast<int>(mip_level);
+      MapHelper<NMGenerationAttribs> normal_generation_attribs(context, normal_generation_attribs_cbuffer, MAP_WRITE, MAP_FLAG_DISCARD);
+      normal_generation_attribs->height_scale        = m_Params.m_TerrainAttribs.height_scale;
+      normal_generation_attribs->m_fSampleSpacingInterval = m_Params.m_TerrainAttribs.m_fElevationSamplingInterval;
+      normal_generation_attribs->m_iMIPLevel              = static_cast<int>(mip_level);
     }
 
     DrawAttribs draw_attrs(4, DRAW_FLAG_VERIFY_ALL);
@@ -764,7 +764,7 @@ void EarthHemsiphere::Create(class ElevationDataSource* pDataSource,
 
   std::vector<HemisphereVertex> VB;
   GenerateSphereGeometry<Uint32>(pDevice, Diligent::AirScatteringAttribs().fEarthRadius, m_Params.ring_dim, m_Params.num_rings, pDataSource,
-                                 m_Params.m_TerrainAttribs.m_fElevationSamplingInterval, m_Params.m_TerrainAttribs.m_fElevationScale, VB,
+                                 m_Params.m_TerrainAttribs.m_fElevationSamplingInterval, m_Params.m_TerrainAttribs.height_scale, VB,
                                  m_SphereMeshes);
 
   BufferDesc VBDesc;

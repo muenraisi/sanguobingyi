@@ -6,74 +6,70 @@ Texture2D< uint > g_tex2DElevationMap;
 
 cbuffer cbNMGenerationAttribs
 {
-    NMGenerationAttribs g_NMGenerationAttribs;
+	NMGenerationAttribs g_normal_generation_attribs;
 };
 
 
-float3 ComputeNormal(int2 i2ElevMapIJ,
-                     float fSampleSpacingInterval,
-                     int MIPLevel)
+float3 ComputeNormal(int2 i2ElevMapIJ, float f_sample_spacing_interval, int i_mip_level)
 {
-    int MipWidth, MipHeight;
-    // This version of GetDimensions() does not work on D3D12. Looks like a bug
-    // in shader compiler
-    //g_tex2DElevationMap.GetDimensions( MIPLevel, MipWidth, MipHeight, Levels );
-    g_tex2DElevationMap.GetDimensions( MipWidth, MipHeight );
-    MipWidth = MipWidth >> MIPLevel;
-    MipHeight = MipHeight >> MIPLevel;
+	int i_mip_width, i_mip_height;
+	// This version of GetDimensions() does not work on D3D12. Looks like a bug in shader compiler
+	// g_tex2DElevationMap.GetDimensions( i_mip_level, i_mip_width, i_mip_height, Levels );
+	g_tex2DElevationMap.GetDimensions(i_mip_width, i_mip_height);
+	i_mip_width = i_mip_width >> i_mip_level;
+	i_mip_height = i_mip_height >> i_mip_level;
 
-    int i0  = i2ElevMapIJ.x;
-    int i1  = min( i0 + 1, MipWidth - 1 );
-    int i_1 = max( i0 - 1, 0 );
+	int i = i2ElevMapIJ.x;
+	int i_plus = min(i + 1, i_mip_width - 1);
+	int i_minus = max(i - 1, 0);
 
-    int j0  = i2ElevMapIJ.y;
-    int j1  = min( j0 + 1, MipHeight - 1 );
-    int j_1 = max( j0 - 1, 0 );
+	int j = i2ElevMapIJ.y;
+	int j_plus = min(j + 1, i_mip_height - 1);
+	int j_minus = max(j - 1, 0);
 
-#   define GET_ELEV(i,j) float( g_tex2DElevationMap.Load(int3(i,j, MIPLevel)) )
+# define GET_ELEV(x,y) float( g_tex2DElevationMap.Load(int3(x,y, i_mip_level)) )
 
 #if 1
-    float Height00 = GET_ELEV( i_1, j_1 );
-    float Height10 = GET_ELEV(  i0, j_1 );
-    float Height20 = GET_ELEV(  i1, j_1 );
+	float f_height_00 = GET_ELEV(i_minus, j_minus);
+	float f_height_10 = GET_ELEV(i, j_minus);
+	float f_height_20 = GET_ELEV(i_plus, j_minus);
 
-    float Height01 = GET_ELEV( i_1, j0 );
-  //float Height11 = GET_ELEV(  i0, j0 );
-    float Height21 = GET_ELEV(  i1, j0 );
+	float f_height_01 = GET_ELEV(i_minus, j);
+	//float f_height_11 = GET_ELEV(  i0, j0 );
+	float f_height_21 = GET_ELEV(i_plus, j);
 
-    float Height02 = GET_ELEV( i_1, j1 );
-    float Height12 = GET_ELEV(  i0, j1 );
-    float Height22 = GET_ELEV(  i1, j1 );
+	float f_height_02 = GET_ELEV(i_minus, j_plus);
+	float f_height_12 = GET_ELEV(i, j_plus);
+	float f_height_22 = GET_ELEV(i_plus, j_plus);
 
-    float3 Grad;
-    Grad.x = (Height00+Height01+Height02) - (Height20+Height21+Height22);
-    Grad.y = (Height00+Height10+Height20) - (Height02+Height12+Height22);
-    Grad.z = fSampleSpacingInterval * 6.0;
-    //Grad.x = (3*Height00+10*Height01+3*Height02) - (3*Height20+10*Height21+3*Height22);
-    //Grad.y = (3*Height00+10*Height10+3*Height20) - (3*Height02+10*Height12+3*Height22);
-    //Grad.z = fSampleSpacingInterval * 32.f;
+	float3 f3_grad;
+	f3_grad.x = (f_height_00 + f_height_01 + f_height_02) - (f_height_20 + f_height_21 + f_height_22);
+	f3_grad.y = (f_height_00 + f_height_10 + f_height_20) - (f_height_02 + f_height_12 + f_height_22);
+	f3_grad.z = f_sample_spacing_interval * 6.0;
+	//f3_grad.x = (3*f_height_00+10*f_height_01+3*f_height_02) - (3*f_height_20+10*f_height_21+3*f_height_22);
+	//f3_grad.y = (3*f_height_00+10*f_height_10+3*f_height_20) - (3*f_height_02+10*f_height_12+3*f_height_22);
+	//f3_grad.z = f_sample_spacing_interval * 32.f;
 #else
-    float Height1 = GET_ELEV(  i1,  j0 );
-    float Height2 = GET_ELEV( i_1,  j0 );
-    float Height3 = GET_ELEV(  i0,  j1 );
-    float Height4 = GET_ELEV(  i0, j_1 );
-       
-    float3 Grad;
-    Grad.x = Height2 - Height1;
-    Grad.y = Height4 - Height3;
-    Grad.z = fSampleSpacingInterval * 2.0;
-#endif
-    Grad.xy *= g_NMGenerationAttribs.m_fElevationScale;
-    float3 Normal = normalize( Grad );
+	float f_height_1 = GET_ELEV(i_plus, j);
+	float f_height_2 = GET_ELEV(i_minus, j);
+	float f_height_3 = GET_ELEV(i, j_plus);
+	float f_height_4 = GET_ELEV(i, j_minus);
 
-    return Normal;
+	float3 f3_grad;
+	f3_grad.x = f_height_2 - f_height_1;
+	f3_grad.y = f_height_4 - f_height_3;
+	f3_grad.z = f_sample_spacing_interval * 2.0;
+#endif
+	f3_grad.xy *= g_normal_generation_attribs.height_scale;
+	float3 f3_normal = normalize(f3_grad);
+
+	return f3_normal;
 }
 
 
-void GenerateNormalMapPS(in float4 f4Pos : SV_Position,
-                         out float2 f2outNormalXY : SV_Target)
+void GenerateNormalMapPS(in float4 f4Pos : SV_Position,	out float2 f2_out_normal_xy : SV_Target)
 {
-    float3 Normal = ComputeNormal( int2(f4Pos.xy), g_NMGenerationAttribs.m_fSampleSpacingInterval*exp2( float(g_NMGenerationAttribs.m_iMIPLevel) ), g_NMGenerationAttribs.m_iMIPLevel );
-    // Only xy components are stored. z component is calculated in the shader
-    f2outNormalXY = Normal.xy * float2(0.5,0.5) + float2(0.5,0.5);
+	float3 f3_normal = ComputeNormal(int2(f4Pos.xy), g_normal_generation_attribs.m_fSampleSpacingInterval * exp2(float(g_normal_generation_attribs.m_iMIPLevel)), g_normal_generation_attribs.m_iMIPLevel);
+	// Only xy components are stored. z component is calculated in the shader
+	f2_out_normal_xy = f3_normal.xy * float2(0.5, 0.5) + float2(0.5, 0.5);
 }
