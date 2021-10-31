@@ -10,7 +10,7 @@ cbuffer cbNMGenerationAttribs
 };
 
 
-float3 ComputeNormal(int2 i2ElevMapIJ, float f_sample_spacing_interval, int i_mip_level)
+float3 ComputeNormal(int2 i2_elev_map_ij, float f_sample_spacing_interval, int i_mip_level)
 {
 	int i_mip_width, i_mip_height;
 	// This version of GetDimensions() does not work on D3D12. Looks like a bug in shader compiler
@@ -19,11 +19,11 @@ float3 ComputeNormal(int2 i2ElevMapIJ, float f_sample_spacing_interval, int i_mi
 	i_mip_width = i_mip_width >> i_mip_level;
 	i_mip_height = i_mip_height >> i_mip_level;
 
-	int i = i2ElevMapIJ.x;
+	int i = i2_elev_map_ij.x;
 	int i_plus = min(i + 1, i_mip_width - 1);
 	int i_minus = max(i - 1, 0);
 
-	int j = i2ElevMapIJ.y;
+	int j = i2_elev_map_ij.y;
 	int j_plus = min(j + 1, i_mip_height - 1);
 	int j_minus = max(j - 1, 0);
 

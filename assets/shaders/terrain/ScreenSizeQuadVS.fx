@@ -1,16 +1,16 @@
 
 #include "TerrainShadersCommon.fxh"
-
-void GenerateScreenSizeQuadVS(in uint VertexId : SV_VertexID,
-                              out float4 f4Pos : SV_Position)
+ 
+void GenerateScreenSizeQuadVS(in uint ui_vertex_id : SV_VertexID,
+                              out float4 f4_pos : SV_Position)
 {
-    float4 MinMaxUV = float4(-1.0, -1.0, 1.0, 1.0);
+    float4 f4_min_max_uv = float4(-1.0, -1.0, 1.0, 1.0);
     
-    float2 Verts[4];
-    Verts[0] = MinMaxUV.xy;
-    Verts[1] = MinMaxUV.xw;
-    Verts[2] = MinMaxUV.zy;
-    Verts[3] = MinMaxUV.zw;
+    float2 f2_verts[4];
+    f2_verts[0] = f4_min_max_uv.xy;
+    f2_verts[1] = f4_min_max_uv.xw;
+    f2_verts[2] = f4_min_max_uv.zy;
+    f2_verts[3] = f4_min_max_uv.zw;
 
-    f4Pos = float4(Verts[VertexId], 1.0, 1.0);
+    f4_pos = float4(f2_verts[ui_vertex_id], 1.0, 1.0);
 }
