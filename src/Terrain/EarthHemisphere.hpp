@@ -67,7 +67,7 @@ namespace Diligent
 // Structure describing terrain rendering parameters
 struct RenderingParams
 {
-  TerrainAttribs m_TerrainAttribs;
+  TerrainAttribs terrain_attribs;
 
   enum TEXTURING_MODE
   {
@@ -148,27 +148,27 @@ private:
                        size_t          HeightMapDim,
                        ITexture*       ptex2DNormalMap);
 
-  RenderingParams m_Params;
+  RenderingParams params_;
 
   RefCntAutoPtr<IRenderDevice> device_;
 
-  RefCntAutoPtr<IBuffer>      m_pcbTerrainAttribs;
-  RefCntAutoPtr<IBuffer>      m_pVertBuff;
-  RefCntAutoPtr<ITextureView> m_ptex2DNormalMapSRV, m_ptex2DMtrlMaskSRV;
+  RefCntAutoPtr<IBuffer>      terrain_attribs_buffer_;
+  RefCntAutoPtr<IBuffer>      vertex_buffer_;
+  RefCntAutoPtr<ITextureView> normal_map_srv, m_ptex2DMtrlMaskSRV;
 
   RefCntAutoPtr<ITextureView> m_ptex2DTilesSRV[NUM_TILE_TEXTURES];
   RefCntAutoPtr<ITextureView> m_ptex2DTilNormalMapsSRV[NUM_TILE_TEXTURES];
 
   RefCntAutoPtr<IResourceMapping> resource_mapping_;
-  RefCntAutoPtr<IShader>          m_pHemisphereVS;
+  RefCntAutoPtr<IShader>          hemisphere_vs_;
 
-  RefCntAutoPtr<IPipelineState>         m_pHemisphereZOnlyPSO;
-  RefCntAutoPtr<IShaderResourceBinding> m_pHemisphereZOnlySRB;
+  RefCntAutoPtr<IPipelineState>         hemisphere_z_only_pso_;
+  RefCntAutoPtr<IShaderResourceBinding> hemisphere_z_only_srb_;
   RefCntAutoPtr<IPipelineState>         m_pHemispherePSO;
   RefCntAutoPtr<IShaderResourceBinding> m_pHemisphereSRB;
-  RefCntAutoPtr<ISampler>               m_pComparisonSampler;
+  RefCntAutoPtr<ISampler>               comparison_sampler_;
 
-  std::vector<RingSectorMesh> m_SphereMeshes;
+  std::vector<RingSectorMesh> sphere_meshes_;
 
   Uint32 m_ValidShaders;
 };

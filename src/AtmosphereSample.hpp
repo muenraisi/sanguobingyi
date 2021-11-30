@@ -77,7 +77,7 @@ private:
     int    iFixedFilterSize           = 5;
   } m_ShadowSettings;
 
-  RefCntAutoPtr<ISampler> m_pComparisonSampler;
+  RefCntAutoPtr<ISampler> comparison_sampler_;
 
   RenderingParams                m_TerrainRenderParams;
   EpipolarLightScatteringAttribs m_PPAttribs;

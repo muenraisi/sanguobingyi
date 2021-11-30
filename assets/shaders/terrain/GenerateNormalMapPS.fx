@@ -69,7 +69,7 @@ float3 ComputeNormal(int2 i2_elev_map_ij, float f_sample_spacing_interval, int i
 
 void GenerateNormalMapPS(in float4 f4Pos : SV_Position,	out float2 f2_out_normal_xy : SV_Target)
 {
-	float3 f3_normal = ComputeNormal(int2(f4Pos.xy), g_normal_generation_attribs.m_fSampleSpacingInterval * exp2(float(g_normal_generation_attribs.m_iMIPLevel)), g_normal_generation_attribs.m_iMIPLevel);
+	float3 f3_normal = ComputeNormal(int2(f4Pos.xy), g_normal_generation_attribs.sample_spacing_interval * exp2(float(g_normal_generation_attribs.mip_level)), g_normal_generation_attribs.mip_level);
 	// Only xy components are stored. z component is calculated in the shader
 	f2_out_normal_xy = f3_normal.xy * float2(0.5, 0.5) + float2(0.5, 0.5);
 }

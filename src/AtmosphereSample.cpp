@@ -111,9 +111,9 @@ void AtmosphereSample::Initialize(const SampleInitInfo& InitInfo)
     m_pElevDataSource.reset(new ElevationDataSource(m_strRawDEMDataFile.c_str()));
     m_pElevDataSource->SetOffsets(m_TerrainRenderParams.m_iColOffset, m_TerrainRenderParams.m_iRowOffset);
     m_fMinElevation =
-      m_pElevDataSource->GetGlobalMinElevation() * m_TerrainRenderParams.m_TerrainAttribs.height_scale;
+      m_pElevDataSource->GetGlobalMinElevation() * m_TerrainRenderParams.terrain_attribs.height_scale;
     m_fMaxElevation =
-      m_pElevDataSource->GetGlobalMaxElevation() * m_TerrainRenderParams.m_TerrainAttribs.height_scale;
+      m_pElevDataSource->GetGlobalMaxElevation() * m_TerrainRenderParams.terrain_attribs.height_scale;
   }
   catch (const std::exception&)
   {
@@ -481,7 +481,7 @@ void AtmosphereSample::CreateShadowMap()
   SMMgrInitInfo.NumCascades = m_TerrainRenderParams.m_iNumShadowCascades;
   SMMgrInitInfo.ShadowMode  = SHADOW_MODE_PCF;
 
-  if (!m_pComparisonSampler)
+  if (!comparison_sampler_)
   {
     SamplerDesc ComparsionSampler;
     ComparsionSampler.ComparisonFunc = COMPARISON_FUNC_LESS;
@@ -490,9 +490,9 @@ void AtmosphereSample::CreateShadowMap()
     ComparsionSampler.MinFilter = FILTER_TYPE_COMPARISON_LINEAR;
     ComparsionSampler.MagFilter = FILTER_TYPE_COMPARISON_LINEAR;
     ComparsionSampler.MipFilter = FILTER_TYPE_COMPARISON_LINEAR;
-    m_pDevice->CreateSampler(ComparsionSampler, &m_pComparisonSampler);
+    m_pDevice->CreateSampler(ComparsionSampler, &comparison_sampler_);
   }
-  SMMgrInitInfo.pComparisonSampler = m_pComparisonSampler;
+  SMMgrInitInfo.pComparisonSampler = comparison_sampler_;
 
   m_ShadowMapMgr.Initialize(m_pDevice, SMMgrInitInfo);
 }

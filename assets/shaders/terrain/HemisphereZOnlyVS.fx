@@ -1,5 +1,5 @@
 
-#include "HostSharedTerrainStructs.fxh"
+#include "../HostSharedTerrainStructs.fxh"
 #include "TerrainShadersCommon.fxh"
 
 cbuffer cbCameraAttribs

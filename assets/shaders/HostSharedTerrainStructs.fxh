@@ -36,7 +36,7 @@
 struct TerrainAttribs
 {
     float height_scale;
-    float m_fElevationSamplingInterval;
+    float elevation_sampling_interval;
     float m_fEarthRadius;
     float m_fBaseMtrlTilingScale;
     float4 m_f4TilingScale;
@@ -46,7 +46,7 @@ struct TerrainAttribs
 #ifdef __cplusplus
     TerrainAttribs() : 
         height_scale(0.1f),
-		m_fElevationSamplingInterval(32.f),
+		elevation_sampling_interval(32.f),
         m_fEarthRadius(6371000.f),
         m_fBaseMtrlTilingScale(200.f),
         m_f4TilingScale(500.f, 800.f, 80.f, 80.f)
@@ -68,8 +68,8 @@ struct TerrainAttribs
 
 struct NMGenerationAttribs
 {
-    float m_fSampleSpacingInterval;
-    int   m_iMIPLevel;
+    float sample_spacing_interval;
+    int   mip_level;
     float height_scale;
     float m_fDummy;
 };
