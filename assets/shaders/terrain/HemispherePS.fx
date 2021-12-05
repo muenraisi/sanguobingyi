@@ -48,22 +48,22 @@ void CombineMaterials(in float4 MtrlWeights,
 	SurfaceColor = float3(0.0, 0.0, 0.0);
 	SurfaceNormalTS = float3(0.0, 0.0, 1.0);
 
-    // Normalize weights and compute base material weight
+  // Normalize weights and compute base material weight
 	MtrlWeights /= max(dot(MtrlWeights, float4(1.0, 1.0, 1.0, 1.0)), 1.0);
 	float BaseMaterialWeight = saturate(1.0 - dot(MtrlWeights, float4(1.0, 1.0, 1.0, 1.0)));
     
-    // The mask is already sharp
+  // The mask is already sharp
 
-    ////Sharpen the mask
-    //float2 TmpMin2 = min(MtrlWeights.rg, MtrlWeights.ba);
-    //float Min = min(TmpMin2.r, TmpMin2.g);
-    //Min = min(Min, BaseMaterialWeight);
-    //float p = 4;
-    //BaseMaterialWeight = pow(BaseMaterialWeight-Min, p);
-    //MtrlWeights = pow(MtrlWeights-Min, p);
-    //float NormalizationFactor = dot(MtrlWeights, float4(1,1,1,1)) + BaseMaterialWeight;
-    //MtrlWeights /= NormalizationFactor;
-    //BaseMaterialWeight /= NormalizationFactor;
+  // //Sharpen the mask
+  // float2 TmpMin2 = min(MtrlWeights.rg, MtrlWeights.ba);
+  // float Min = min(TmpMin2.r, TmpMin2.g);
+  // Min = min(Min, BaseMaterialWeight);
+  // float p = 4;
+  // BaseMaterialWeight = pow(BaseMaterialWeight-Min, p);
+  // MtrlWeights = pow(MtrlWeights-Min, p);
+  // float NormalizationFactor = dot(MtrlWeights, float4(1,1,1,1)) + BaseMaterialWeight;
+  // MtrlWeights /= NormalizationFactor;
+  // BaseMaterialWeight /= NormalizationFactor;
 
 	// Get diffuse color of the base material
 	float3 BaseMaterialDiffuse = g_tex2DTileDiffuse[0].Sample(g_tex2DTileDiffuse_sampler, f2TileUV.xy / g_TerrainAttribs.m_fBaseMtrlTilingScale);
@@ -112,6 +112,7 @@ void CombineMaterials(in float4 MtrlWeights,
 #endif
 }
 
+// entry point
 void HemispherePS(in float4 f4Pos : SV_Position,
                   HemisphereVSOutput VSOut,
                   // IMPORTANT: non-system generated pixel shader input

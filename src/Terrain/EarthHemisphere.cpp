@@ -290,7 +290,7 @@ void GenerateSphereGeometry(IRenderDevice*                 device,
   RingMeshBuilder<Uint32>   ring_mesh_builder(device, vert_buff, grid_dim, sphere_meshes);
 
   size_t start_ring = 0;
-  vert_buff.reserve(num_rings  * grid_dim * grid_dim);
+  vert_buff.reserve(num_rings * grid_dim * grid_dim);
   for (size_t ring = start_ring; ring < num_rings; ++ring)
   {
     size_t now_index_init = vert_buff.size();
@@ -497,12 +497,12 @@ void EarthHemsiphere::RenderNormalMap(IRenderDevice*  device,
   coarse_mip_levels.resize(height_map_dim / 2 * height_map_dim);
 
   std::vector<TextureSubResData> mip_map_data(height_map_desc.MipLevels);
-  mip_map_data[0].pData            = height_map_data;
-  mip_map_data[0].Stride           = (Uint32)height_map_pitch * sizeof(height_map_data[0]);
+  mip_map_data[0].pData        = height_map_data;
+  mip_map_data[0].Stride       = (Uint32)height_map_pitch * sizeof(height_map_data[0]);
   const Uint16* finer_mip_data = height_map_data;
-  Uint16*       now_mip_data  = &coarse_mip_levels[0];
+  Uint16*       now_mip_data   = &coarse_mip_levels[0];
   size_t        FinerMipPitch  = height_map_pitch;
-  size_t        now_mip_pitch   = height_map_dim / 2;//All mip levels are stacked on top of each other with the same stride
+  size_t        now_mip_pitch  = height_map_dim / 2; //All mip levels are stacked on top of each other with the same stride
   for (size_t mip_level = 1; mip_level < height_map_desc.MipLevels; ++mip_level)
   {
     auto mip_width  = height_map_desc.Width >> mip_level;
@@ -520,8 +520,8 @@ void EarthHemsiphere::RenderNormalMap(IRenderDevice*  device,
 
     mip_map_data[mip_level].pData  = now_mip_data;
     mip_map_data[mip_level].Stride = (Uint32)now_mip_pitch * sizeof(*now_mip_data);
-    finer_mip_data              = now_mip_data;
-    FinerMipPitch               = now_mip_pitch;
+    finer_mip_data                 = now_mip_data;
+    FinerMipPitch                  = now_mip_pitch;
     now_mip_data += mip_height * now_mip_pitch;
     now_mip_pitch = height_map_dim / 2;
   }
@@ -536,7 +536,7 @@ void EarthHemsiphere::RenderNormalMap(IRenderDevice*  device,
   resource_mapping_->AddResource("g_tex2DElevationMap", height_map_texture->GetDefaultView(TEXTURE_VIEW_SHADER_RESOURCE), true);
 
   RefCntAutoPtr<IBuffer> normal_generation_attribs_cbuffer;
-  CreateUniformBuffer(device, sizeof(NMGenerationAttribs), "NM Generation Attribs CB", &normal_generation_attribs_cbuffer);//NM(normal)
+  CreateUniformBuffer(device, sizeof(NMGenerationAttribs), "NM Generation Attribs CB", &normal_generation_attribs_cbuffer); //NM(normal)
 
   resource_mapping_->AddResource("cbNMGenerationAttribs", normal_generation_attribs_cbuffer, true);
 
@@ -566,7 +566,7 @@ void EarthHemsiphere::RenderNormalMap(IRenderDevice*  device,
   pso_create_info.pVS = screen_size_quad_vs;
   pso_create_info.pPS = generate_normal_map_ps;
 
-  PipelineStateDesc&              pso_desc = pso_create_info.PSODesc;
+  PipelineStateDesc& pso_desc                 = pso_create_info.PSODesc;
   pso_desc.ResourceLayout.DefaultVariableType = SHADER_RESOURCE_VARIABLE_TYPE_STATIC;
   // clang-format off
   ShaderResourceVariableDesc shader_vars[] = 
@@ -577,9 +577,9 @@ void EarthHemsiphere::RenderNormalMap(IRenderDevice*  device,
   // clang-format on
   pso_desc.ResourceLayout.NumVariables = _countof(shader_vars);
   pso_desc.ResourceLayout.Variables    = shader_vars;
-  pso_desc.Name           = "Render Normal Map";
+  pso_desc.Name                        = "Render Normal Map";
 
-  GraphicsPipelineDesc& graphics_pipline_desc = pso_create_info.GraphicsPipeline;
+  GraphicsPipelineDesc& graphics_pipline_desc                = pso_create_info.GraphicsPipeline;
   graphics_pipline_desc.DepthStencilDesc.DepthEnable         = false;
   graphics_pipline_desc.DepthStencilDesc.DepthWriteEnable    = false;
   graphics_pipline_desc.RasterizerDesc.FillMode              = FILL_MODE_SOLID;
@@ -629,14 +629,14 @@ void EarthHemsiphere::Create(class ElevationDataSource* data_source,
                              const RenderingParams&     params,
                              IRenderDevice*             device,
                              IDeviceContext*            context,
-                             const Char*                MaterialMaskPath,
-                             const Char*                TileTexturePath[],
-                             const Char*                TileNormalMapPath[],
+                             const Char*                material_mask_path,
+                             const Char*                tile_diffuse_path[],
+                             const Char*                tile_normal_path[],
                              IBuffer*                   camera_attribs_buffer,
                              IBuffer*                   light_attribs_buffer,
                              IBuffer*                   media_scattering_params)
 {
-  params_  = params;
+  params_ = params;
   device_ = device;
 
   const Uint16* height_map_data;
@@ -677,7 +677,7 @@ void EarthHemsiphere::Create(class ElevationDataSource* data_source,
   device->CreateResourceMapping(res_mapping_desc, &resource_mapping_);
 
   RefCntAutoPtr<ITexture> material_mask_texture;
-  CreateTextureFromFile(MaterialMaskPath, TextureLoadInfo(), device, &material_mask_texture);
+  CreateTextureFromFile(material_mask_path, TextureLoadInfo(), device, &material_mask_texture);
   auto material_mask_srv = material_mask_texture->GetDefaultView(TEXTURE_VIEW_SHADER_RESOURCE);
   resource_mapping_->AddResource("g_tex2DMtrlMap", material_mask_srv, true);
 
@@ -691,12 +691,12 @@ void EarthHemsiphere::Create(class ElevationDataSource* data_source,
     {
       TextureLoadInfo diff_tex_load_info;
       diff_tex_load_info.IsSRGB = false;
-      CreateTextureFromFile(TileTexturePath[i], diff_tex_load_info, device, &tile_diffuse_texture[i]);
+      CreateTextureFromFile(tile_diffuse_path[i], diff_tex_load_info, device, &tile_diffuse_texture[i]);
       tile_diffuse_srv[i] = tile_diffuse_texture[i]->GetDefaultView(TEXTURE_VIEW_SHADER_RESOURCE);
     }
 
     {
-      CreateTextureFromFile(TileNormalMapPath[i], TextureLoadInfo(), device, &tile_normal_texture[i]);
+      CreateTextureFromFile(tile_normal_path[i], TextureLoadInfo(), device, &tile_normal_texture[i]);
       tile_normal_srv[i] = tile_normal_texture[i]->GetDefaultView(TEXTURE_VIEW_SHADER_RESOURCE);
     }
   }
@@ -746,17 +746,17 @@ void EarthHemsiphere::Create(class ElevationDataSource* data_source,
     GraphicsPipeline.RasterizerDesc.CullMode              = CULL_MODE_BACK;
     GraphicsPipeline.RasterizerDesc.DepthClipEnable       = False;
     GraphicsPipeline.RasterizerDesc.FrontCounterClockwise = True;
-    //clang-format off
-    LayoutElement inputs[] =
+    // clang-format off
+    LayoutElement layout_inputs[] =
     {
       {0, 0, 3, VT_FLOAT32, False, 0, (3+2)*4}
     };
-    //clang-format on
-    GraphicsPipeline.InputLayout.LayoutElements = inputs;
-    GraphicsPipeline.InputLayout.NumElements    = _countof(inputs);
+    // clang-format on
+    GraphicsPipeline.InputLayout.LayoutElements = layout_inputs;
+    GraphicsPipeline.InputLayout.NumElements    = _countof(layout_inputs);
     GraphicsPipeline.DSVFormat                  = params_.ShadowMapFormat;
     GraphicsPipeline.PrimitiveTopology          = PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP;
-    pso_create_info.pVS                           = hemisphere_z_only_vs_;
+    pso_create_info.pVS                         = hemisphere_z_only_vs_;
     device->CreateGraphicsPipelineState(pso_create_info, &hemisphere_z_only_pso_);
     hemisphere_z_only_pso_->BindStaticResources(SHADER_TYPE_VERTEX | SHADER_TYPE_PIXEL, resource_mapping_, BIND_SHADER_RESOURCES_VERIFY_ALL_RESOLVED);
     hemisphere_z_only_pso_->CreateShaderResourceBinding(&hemisphere_z_only_srb_, true);
@@ -780,23 +780,26 @@ void EarthHemsiphere::Create(class ElevationDataSource* data_source,
 }
 
 void EarthHemsiphere::Render(IDeviceContext*        pContext,
-                             const RenderingParams& NewParams,
-                             const float3&          vCameraPosition,
-                             const float4x4&        CameraViewProjMatrix,
-                             ITextureView*          pShadowMapSRV,
-                             ITextureView*          pPrecomputedNetDensitySRV,
-                             ITextureView*          pAmbientSkylightSRV,
-                             bool                   bZOnlyPass)
+                             const RenderingParams& new_params,
+                             const float4x4&        camera_view_proj_matrix,
+                             ITextureView*          shadow_map_srv,
+                             ITextureView*          pre_computeD_net_density_srv,
+                             ITextureView*          ambient_skylight_srv,
+                             bool                   z_only_pass)
 {
-  if (params_.m_iNumShadowCascades != NewParams.m_iNumShadowCascades || params_.m_bBestCascadeSearch != NewParams.m_bBestCascadeSearch ||
-      params_.m_FilterAcrossShadowCascades != NewParams.m_FilterAcrossShadowCascades ||
-      params_.m_FixedShadowFilterSize != NewParams.m_FixedShadowFilterSize || params_.DstRTVFormat != NewParams.DstRTVFormat)
+  // clang-format off
+  if (params_.num_shadow_cascades != new_params.num_shadow_cascades || 
+      params_.best_cascade_search != new_params.best_cascade_search ||
+      params_.filter_across_shadow_cascades != new_params.filter_across_shadow_cascades ||
+      params_.fixed_shadow_filter_size != new_params.fixed_shadow_filter_size ||
+      params_.DstRTVFormat != new_params.DstRTVFormat)
+  // clang-format on
   {
-    m_pHemispherePSO.Release();
-    m_pHemisphereSRB.Release();
+    hemisphere_pso_.Release();
+    hemisphere_srb_.Release();
   }
 
-  params_ = NewParams;
+  params_ = new_params;
 
 #if 0
     if( GetAsyncKeyState(VK_F9) )
@@ -805,69 +808,69 @@ void EarthHemsiphere::Render(IDeviceContext*        pContext,
     }
 #endif
 
-  if (!m_pHemispherePSO)
+  if (!hemisphere_pso_)
   {
-    ShaderCreateInfo Attrs;
-    Attrs.FilePath                   = "HemispherePS.fx";
-    Attrs.EntryPoint                 = "HemispherePS";
-    Attrs.Desc.ShaderType            = SHADER_TYPE_PIXEL;
-    Attrs.Desc.Name                  = "HemispherePS";
-    Attrs.UseCombinedTextureSamplers = true;
-    Attrs.SourceLanguage             = SHADER_SOURCE_LANGUAGE_HLSL;
-    RefCntAutoPtr<IShaderSourceInputStreamFactory> pShaderSourceFactory;
-    device_->GetEngineFactory()->CreateDefaultShaderSourceStreamFactory("shaders;shaders\\terrain;", &pShaderSourceFactory);
-    Attrs.pShaderSourceStreamFactory = pShaderSourceFactory;
+    ShaderCreateInfo shader_create_info;
+    shader_create_info.FilePath                   = "HemispherePS.fx";
+    shader_create_info.EntryPoint                 = "HemispherePS";
+    shader_create_info.Desc.ShaderType            = SHADER_TYPE_PIXEL;
+    shader_create_info.Desc.Name                  = "HemispherePS";
+    shader_create_info.UseCombinedTextureSamplers = true;
+    shader_create_info.SourceLanguage             = SHADER_SOURCE_LANGUAGE_HLSL;
+    RefCntAutoPtr<IShaderSourceInputStreamFactory> shader_source_factory;
+    device_->GetEngineFactory()->CreateDefaultShaderSourceStreamFactory("shaders;shaders\\terrain;", &shader_source_factory);
+    shader_create_info.pShaderSourceStreamFactory = shader_source_factory;
 
-    std::array<ImmutableSamplerDesc, 5> ImtblSamplers = {};
+    std::array<ImmutableSamplerDesc, 5> imtbl_samplers = {};
 
-    ImtblSamplers[0].ShaderStages         = SHADER_TYPE_PIXEL;
-    ImtblSamplers[0].SamplerOrTextureName = "g_tex2DTileDiffuse";
-    ImtblSamplers[0].Desc.AddressU        = TEXTURE_ADDRESS_WRAP;
-    ImtblSamplers[0].Desc.AddressV        = TEXTURE_ADDRESS_WRAP;
-    ImtblSamplers[0].Desc.AddressW        = TEXTURE_ADDRESS_WRAP;
+    imtbl_samplers[0].ShaderStages         = SHADER_TYPE_PIXEL;
+    imtbl_samplers[0].SamplerOrTextureName = "g_tex2DTileDiffuse";
+    imtbl_samplers[0].Desc.AddressU        = TEXTURE_ADDRESS_WRAP;
+    imtbl_samplers[0].Desc.AddressV        = TEXTURE_ADDRESS_WRAP;
+    imtbl_samplers[0].Desc.AddressW        = TEXTURE_ADDRESS_WRAP;
 
-    ImtblSamplers[1].ShaderStages         = SHADER_TYPE_PIXEL;
-    ImtblSamplers[1].SamplerOrTextureName = "g_tex2DTileNM";
-    ImtblSamplers[1].Desc                 = ImtblSamplers[0].Desc;
+    imtbl_samplers[1].ShaderStages         = SHADER_TYPE_PIXEL;
+    imtbl_samplers[1].SamplerOrTextureName = "g_tex2DTileNM";
+    imtbl_samplers[1].Desc                 = imtbl_samplers[0].Desc;
 
-    ImtblSamplers[2].ShaderStages         = SHADER_TYPE_PIXEL;
-    ImtblSamplers[2].SamplerOrTextureName = "g_tex2DNormalMap";
-    ImtblSamplers[2].Desc.AddressU        = TEXTURE_ADDRESS_MIRROR;
-    ImtblSamplers[2].Desc.AddressV        = TEXTURE_ADDRESS_MIRROR;
-    ImtblSamplers[2].Desc.AddressW        = TEXTURE_ADDRESS_MIRROR;
+    imtbl_samplers[2].ShaderStages         = SHADER_TYPE_PIXEL;
+    imtbl_samplers[2].SamplerOrTextureName = "g_tex2DNormalMap";
+    imtbl_samplers[2].Desc.AddressU        = TEXTURE_ADDRESS_MIRROR;
+    imtbl_samplers[2].Desc.AddressV        = TEXTURE_ADDRESS_MIRROR;
+    imtbl_samplers[2].Desc.AddressW        = TEXTURE_ADDRESS_MIRROR;
 
-    ImtblSamplers[3].ShaderStages         = SHADER_TYPE_PIXEL;
-    ImtblSamplers[3].SamplerOrTextureName = "g_tex2DMtrlMap";
-    ImtblSamplers[3].Desc                 = ImtblSamplers[2].Desc;
+    imtbl_samplers[3].ShaderStages         = SHADER_TYPE_PIXEL;
+    imtbl_samplers[3].SamplerOrTextureName = "g_tex2DMtrlMap";
+    imtbl_samplers[3].Desc                 = imtbl_samplers[2].Desc;
 
-    ImtblSamplers[4].ShaderStages         = SHADER_TYPE_PIXEL;
-    ImtblSamplers[4].SamplerOrTextureName = "g_tex2DShadowMap";
-    ImtblSamplers[4].Desc.MinFilter       = FILTER_TYPE_COMPARISON_LINEAR;
-    ImtblSamplers[4].Desc.MagFilter       = FILTER_TYPE_COMPARISON_LINEAR;
-    ImtblSamplers[4].Desc.MipFilter       = FILTER_TYPE_COMPARISON_LINEAR;
-    ImtblSamplers[4].Desc.ComparisonFunc  = COMPARISON_FUNC_LESS;
+    imtbl_samplers[4].ShaderStages         = SHADER_TYPE_PIXEL;
+    imtbl_samplers[4].SamplerOrTextureName = "g_tex2DShadowMap";
+    imtbl_samplers[4].Desc.MinFilter       = FILTER_TYPE_COMPARISON_LINEAR;
+    imtbl_samplers[4].Desc.MagFilter       = FILTER_TYPE_COMPARISON_LINEAR;
+    imtbl_samplers[4].Desc.MipFilter       = FILTER_TYPE_COMPARISON_LINEAR;
+    imtbl_samplers[4].Desc.ComparisonFunc  = COMPARISON_FUNC_LESS;
 
-    ShaderMacroHelper Macros;
-    Macros.AddShaderMacro("TEXTURING_MODE", params_.m_TexturingMode);
-    Macros.AddShaderMacro("NUM_TILE_TEXTURES", NUM_TILE_TEXTURES);
-    Macros.AddShaderMacro("NUM_SHADOW_CASCADES", params_.m_iNumShadowCascades);
-    Macros.AddShaderMacro("BEST_CASCADE_SEARCH", params_.m_bBestCascadeSearch ? true : false);
-    Macros.AddShaderMacro("SHADOW_FILTER_SIZE", params_.m_FixedShadowFilterSize);
-    Macros.AddShaderMacro("FILTER_ACROSS_CASCADES", params_.m_FilterAcrossShadowCascades);
-    Macros.Finalize();
-    Attrs.Macros = Macros;
+    ShaderMacroHelper macros;
+    macros.AddShaderMacro("TEXTURING_MODE", params_.texturing_mode);
+    macros.AddShaderMacro("NUM_TILE_TEXTURES", NUM_TILE_TEXTURES);
+    macros.AddShaderMacro("NUM_SHADOW_CASCADES", params_.num_shadow_cascades);
+    macros.AddShaderMacro("BEST_CASCADE_SEARCH", params_.best_cascade_search ? true : false);
+    macros.AddShaderMacro("SHADOW_FILTER_SIZE", params_.fixed_shadow_filter_size);
+    macros.AddShaderMacro("FILTER_ACROSS_CASCADES", params_.filter_across_shadow_cascades);
+    macros.Finalize();
+    shader_create_info.Macros = macros;
 
-    RefCntAutoPtr<IShader> pHemispherePS;
-    device_->CreateShader(Attrs, &pHemispherePS);
+    RefCntAutoPtr<IShader> hemisphere_ps;
+    device_->CreateShader(shader_create_info, &hemisphere_ps);
 
-    LayoutElement Inputs[] = {{0, 0, 3, VT_FLOAT32}, {1, 0, 2, VT_FLOAT32}};
+    LayoutElement layout_inputs[] = {{0, 0, 3, VT_FLOAT32}, {1, 0, 2, VT_FLOAT32}}; //layout attribs
 
-    GraphicsPipelineStateCreateInfo PSOCreateInfo;
-    PipelineStateDesc&              PSODesc = PSOCreateInfo.PSODesc;
+    GraphicsPipelineStateCreateInfo pso_create_info;
+    PipelineStateDesc&              pso_desc = pso_create_info.PSODesc;
 
-    PSODesc.Name = "RenderHemisphere";
+    pso_desc.Name = "RenderHemisphere";
 
-    ShaderResourceVariableDesc Vars[] = {
+    ShaderResourceVariableDesc shader_res_vars[] = {
       {SHADER_TYPE_VERTEX, "cbCameraAttribs", SHADER_RESOURCE_VARIABLE_TYPE_MUTABLE},
       {SHADER_TYPE_VERTEX, "cbLightAttribs", SHADER_RESOURCE_VARIABLE_TYPE_MUTABLE},
       {SHADER_TYPE_VERTEX, "cbTerrainAttribs", SHADER_RESOURCE_VARIABLE_TYPE_MUTABLE},
@@ -876,89 +879,67 @@ void EarthHemsiphere::Render(IDeviceContext*        pContext,
       {SHADER_TYPE_VERTEX, "g_tex2DAmbientSkylight", SHADER_RESOURCE_VARIABLE_TYPE_DYNAMIC},
       {SHADER_TYPE_PIXEL, "g_tex2DShadowMap", SHADER_RESOURCE_VARIABLE_TYPE_DYNAMIC},
     };
-    PSODesc.ResourceLayout.Variables            = Vars;
-    PSODesc.ResourceLayout.NumVariables         = _countof(Vars);
-    PSODesc.ResourceLayout.ImmutableSamplers    = ImtblSamplers.data();
-    PSODesc.ResourceLayout.NumImmutableSamplers = static_cast<Uint32>(ImtblSamplers.size());
+    pso_desc.ResourceLayout.Variables            = shader_res_vars;
+    pso_desc.ResourceLayout.NumVariables         = _countof(shader_res_vars);
+    pso_desc.ResourceLayout.ImmutableSamplers    = imtbl_samplers.data();
+    pso_desc.ResourceLayout.NumImmutableSamplers = static_cast<Uint32>(imtbl_samplers.size());
 
-    auto& GraphicsPipeline = PSOCreateInfo.GraphicsPipeline;
+    auto& graphics_pipeline = pso_create_info.GraphicsPipeline;
 
-    GraphicsPipeline.RasterizerDesc.FillMode              = FILL_MODE_SOLID;
-    GraphicsPipeline.RasterizerDesc.CullMode              = CULL_MODE_BACK;
-    GraphicsPipeline.RasterizerDesc.FrontCounterClockwise = True;
-    GraphicsPipeline.InputLayout.LayoutElements           = Inputs;
-    GraphicsPipeline.InputLayout.NumElements              = _countof(Inputs);
-    PSOCreateInfo.pVS                                     = hemisphere_vs_;
-    PSOCreateInfo.pPS                                     = pHemispherePS;
-    GraphicsPipeline.RTVFormats[0]                        = params_.DstRTVFormat;
-    GraphicsPipeline.NumRenderTargets                     = 1;
-    GraphicsPipeline.DSVFormat                            = TEX_FORMAT_D32_FLOAT;
-    GraphicsPipeline.PrimitiveTopology                    = PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP;
-    device_->CreateGraphicsPipelineState(PSOCreateInfo, &m_pHemispherePSO);
-    m_pHemispherePSO->BindStaticResources(SHADER_TYPE_VERTEX | SHADER_TYPE_PIXEL, resource_mapping_, BIND_SHADER_RESOURCES_VERIFY_ALL_RESOLVED);
-    m_pHemispherePSO->CreateShaderResourceBinding(&m_pHemisphereSRB, true);
-    m_pHemisphereSRB->BindResources(SHADER_TYPE_VERTEX, resource_mapping_, BIND_SHADER_RESOURCES_KEEP_EXISTING);
+    graphics_pipeline.RasterizerDesc.FillMode              = FILL_MODE_SOLID;
+    graphics_pipeline.RasterizerDesc.CullMode              = CULL_MODE_BACK;
+    graphics_pipeline.RasterizerDesc.FrontCounterClockwise = True;
+    graphics_pipeline.InputLayout.LayoutElements           = layout_inputs;
+    graphics_pipeline.InputLayout.NumElements              = _countof(layout_inputs);
+    pso_create_info.pVS                                     = hemisphere_vs_;
+    pso_create_info.pPS                                     = hemisphere_ps;
+    graphics_pipeline.RTVFormats[0]                        = params_.DstRTVFormat;
+    graphics_pipeline.NumRenderTargets                     = 1;
+    graphics_pipeline.DSVFormat                            = TEX_FORMAT_D32_FLOAT;
+    graphics_pipeline.PrimitiveTopology                    = PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP;
+    device_->CreateGraphicsPipelineState(pso_create_info, &hemisphere_pso_);
+    hemisphere_pso_->BindStaticResources(SHADER_TYPE_VERTEX | SHADER_TYPE_PIXEL, resource_mapping_, BIND_SHADER_RESOURCES_VERIFY_ALL_RESOLVED);
+    hemisphere_pso_->CreateShaderResourceBinding(&hemisphere_srb_, true);
+    hemisphere_srb_->BindResources(SHADER_TYPE_VERTEX, resource_mapping_, BIND_SHADER_RESOURCES_KEEP_EXISTING);
   }
 
-  ViewFrustumExt ViewFrustum;
-  auto           DevType = device_->GetDeviceInfo().Type;
-  ExtractViewFrustumPlanesFromMatrix(CameraViewProjMatrix, ViewFrustum, DevType == RENDER_DEVICE_TYPE_D3D11 || DevType == RENDER_DEVICE_TYPE_D3D12);
+  ViewFrustumExt view_frustum;
+  auto           dev_type = device_->GetDeviceInfo().Type;
+  ExtractViewFrustumPlanesFromMatrix(camera_view_proj_matrix, view_frustum, dev_type == RENDER_DEVICE_TYPE_D3D11 || dev_type == RENDER_DEVICE_TYPE_D3D12);
 
   {
-    MapHelper<TerrainAttribs> TerrainAttribs(pContext, terrain_attribs_buffer_, MAP_WRITE, MAP_FLAG_DISCARD);
-    *TerrainAttribs = params_.terrain_attribs;
+    MapHelper<TerrainAttribs> terrain_attribs(pContext, terrain_attribs_buffer_, MAP_WRITE, MAP_FLAG_DISCARD);
+    *terrain_attribs = params_.terrain_attribs;
   }
-
-#if 0
-    ID3D11ShaderResourceView *pSRVs[3 + 2*NUM_TILE_TEXTURES] = 
-    {
-        normal_map_srv,
-        m_ptex2DMtrlMaskSRV,
-        pShadowMapSRV
-    };
-    for(int i = 0; i < NUM_TILE_TEXTURES; i++)
-    {
-        pSRVs[3+i] = m_ptex2DTilesSRV[i];
-        pSRVs[3+NUM_TILE_TEXTURES+i] = m_ptex2DTilNormalMapsSRV[i];
-    }
-    pd3dImmediateContext->PSSetShaderResources(1, _countof(pSRVs), pSRVs);
-    pSRVs[0] = pPrecomputedNetDensitySRV;
-    pSRVs[1] = pAmbientSkylightSRV;
-    pd3dImmediateContext->VSSetShaderResources(0, 2, pSRVs);
-
-    ID3D11SamplerState *pSamplers[] = {m_psamLinearMirror, m_psamLinearWrap, m_psamComaprison, m_psamLinearClamp};
-	pd3dImmediateContext->VSSetSamplers(0, _countof(pSamplers), pSamplers);
-	pd3dImmediateContext->PSSetSamplers(0, _countof(pSamplers), pSamplers);
-#endif
 
   IBuffer* ppBuffers[1] = {vertex_buffer_};
   pContext->SetVertexBuffers(0, 1, ppBuffers, nullptr, RESOURCE_STATE_TRANSITION_MODE_TRANSITION, SET_VERTEX_BUFFERS_FLAG_RESET);
 
-  if (bZOnlyPass)
+  if (z_only_pass)
   {
     pContext->SetPipelineState(hemisphere_z_only_pso_);
     pContext->CommitShaderResources(hemisphere_z_only_srb_, RESOURCE_STATE_TRANSITION_MODE_TRANSITION);
   }
   else
   {
-    pShadowMapSRV->SetSampler(comparison_sampler_);
-    pContext->SetPipelineState(m_pHemispherePSO);
+    shadow_map_srv->SetSampler(comparison_sampler_);
+    pContext->SetPipelineState(hemisphere_pso_);
 
-    m_pHemisphereSRB->GetVariableByName(SHADER_TYPE_VERTEX, "g_tex2DOccludedNetDensityToAtmTop")->Set(pPrecomputedNetDensitySRV);
-    m_pHemisphereSRB->GetVariableByName(SHADER_TYPE_VERTEX, "g_tex2DAmbientSkylight")->Set(pAmbientSkylightSRV);
-    m_pHemisphereSRB->GetVariableByName(SHADER_TYPE_PIXEL, "g_tex2DShadowMap")->Set(pShadowMapSRV);
+    hemisphere_srb_->GetVariableByName(SHADER_TYPE_PIXEL, "g_tex2DShadowMap")->Set(shadow_map_srv);
+    hemisphere_srb_->GetVariableByName(SHADER_TYPE_VERTEX, "g_tex2DOccludedNetDensityToAtmTop")->Set(pre_computeD_net_density_srv);
+    hemisphere_srb_->GetVariableByName(SHADER_TYPE_VERTEX, "g_tex2DAmbientSkylight")->Set(ambient_skylight_srv);
 
-    pContext->CommitShaderResources(m_pHemisphereSRB, RESOURCE_STATE_TRANSITION_MODE_TRANSITION);
+    pContext->CommitShaderResources(hemisphere_srb_, RESOURCE_STATE_TRANSITION_MODE_TRANSITION);
   }
 
-  for (auto MeshIt = sphere_meshes_.begin(); MeshIt != sphere_meshes_.end(); ++MeshIt)
+  for (auto mesh_iter = sphere_meshes_.begin(); mesh_iter != sphere_meshes_.end(); ++mesh_iter)
   {
-    if (GetBoxVisibility(ViewFrustum, MeshIt->bound_box, bZOnlyPass ? FRUSTUM_PLANE_FLAG_OPEN_NEAR : FRUSTUM_PLANE_FLAG_FULL_FRUSTUM) !=
+    if (GetBoxVisibility(view_frustum, mesh_iter->bound_box, z_only_pass ? FRUSTUM_PLANE_FLAG_OPEN_NEAR : FRUSTUM_PLANE_FLAG_FULL_FRUSTUM) !=
         BoxVisibility::Invisible)
     {
-      pContext->SetIndexBuffer(MeshIt->index_buffer, 0, RESOURCE_STATE_TRANSITION_MODE_TRANSITION);
-      DrawIndexedAttribs DrawAttrs(MeshIt->num_indices, VT_UINT32, DRAW_FLAG_VERIFY_ALL);
-      pContext->DrawIndexed(DrawAttrs);
+      pContext->SetIndexBuffer(mesh_iter->index_buffer, 0, RESOURCE_STATE_TRANSITION_MODE_TRANSITION);
+      DrawIndexedAttribs draw_attrs(mesh_iter->num_indices, VT_UINT32, DRAW_FLAG_VERIFY_ALL);
+      pContext->DrawIndexed(draw_attrs);
     }
   }
 }

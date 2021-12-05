@@ -55,7 +55,7 @@ AlignEscapedNewlines: Left
 
 
 # If true, horizontally align operands of binary and ternary expressions.
-AlignOperands:   false
+AlignOperands:   true
 
 
 # If true, aligns trailing comments.

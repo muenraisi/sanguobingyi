@@ -77,18 +77,17 @@ struct RenderingParams
   };
 
   // Patch rendering params
-  TEXTURING_MODE m_TexturingMode  = TM_MATERIAL_MASK_NM;
-  int            ring_dim = 65; // 4K+1
-  int            num_rings      = 15;
-
-  int            m_iNumShadowCascades         = 6;
-  int            m_bBestCascadeSearch         = 1;
-  int            m_FixedShadowFilterSize      = 5;
-  bool           m_FilterAcrossShadowCascades = true;
-  int            m_iColOffset                 = 1356;
-  int            m_iRowOffset                 = 924;
-  TEXTURE_FORMAT DstRTVFormat                 = TEX_FORMAT_R11G11B10_FLOAT;
-  TEXTURE_FORMAT ShadowMapFormat              = TEX_FORMAT_D32_FLOAT;
+  TEXTURING_MODE texturing_mode                = TM_MATERIAL_MASK_NM;
+  int            ring_dim                      = 65; // 4K+1
+  int            num_rings                     = 15;
+  int            num_shadow_cascades           = 6;
+  int            best_cascade_search           = 1;
+  int            fixed_shadow_filter_size      = 5;
+  bool           filter_across_shadow_cascades = true;
+  int            m_iColOffset                  = 1356;
+  int            m_iRowOffset                  = 924;
+  TEXTURE_FORMAT DstRTVFormat                  = TEX_FORMAT_R11G11B10_FLOAT;
+  TEXTURE_FORMAT ShadowMapFormat               = TEX_FORMAT_D32_FLOAT;
 };
 
 struct RingSectorMesh
@@ -116,7 +115,6 @@ public:
 
   void Render(IDeviceContext*        pContext,
               const RenderingParams& NewParams,
-              const float3&          vCameraPosition,
               const float4x4&        CameraViewProjMatrix,
               ITextureView*          pShadowMapSRV,
               ITextureView*          pPrecomputedNetDensitySRV,
@@ -164,8 +162,8 @@ private:
 
   RefCntAutoPtr<IPipelineState>         hemisphere_z_only_pso_;
   RefCntAutoPtr<IShaderResourceBinding> hemisphere_z_only_srb_;
-  RefCntAutoPtr<IPipelineState>         m_pHemispherePSO;
-  RefCntAutoPtr<IShaderResourceBinding> m_pHemisphereSRB;
+  RefCntAutoPtr<IPipelineState>         hemisphere_pso_;
+  RefCntAutoPtr<IShaderResourceBinding> hemisphere_srb_;
   RefCntAutoPtr<ISampler>               comparison_sampler_;
 
   std::vector<RingSectorMesh> sphere_meshes_;

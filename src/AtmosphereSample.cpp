@@ -62,13 +62,13 @@ void AtmosphereSample::Initialize(const SampleInitInfo& InitInfo)
   if (AdatperType == ADAPTER_TYPE_INTEGRATED)
   {
     m_ShadowSettings.Resolution                        = 512;
-    m_TerrainRenderParams.m_FilterAcrossShadowCascades = false;
+    m_TerrainRenderParams.filter_across_shadow_cascades = false;
     m_ShadowSettings.iFixedFilterSize                  = 3;
     m_PPAttribs.iFirstCascadeToRayMarch                = 2;
     m_PPAttribs.iSingleScatteringMode                  = SINGLE_SCTR_MODE_LUT;
-    m_TerrainRenderParams.m_iNumShadowCascades         = 4;
+    m_TerrainRenderParams.num_shadow_cascades         = 4;
     m_TerrainRenderParams.num_rings                  = 10;
-    m_TerrainRenderParams.m_TexturingMode              = RenderingParams::TM_MATERIAL_MASK;
+    m_TerrainRenderParams.texturing_mode              = RenderingParams::TM_MATERIAL_MASK;
   }
 
   const auto& RG16UAttribs = m_pDevice->GetTextureFormatInfoExt(TEX_FORMAT_RG16_UNORM);
@@ -177,7 +177,7 @@ void AtmosphereSample::UpdateUI()
         }
       }
 
-      if (ImGui::SliderInt("Num cascades", &m_TerrainRenderParams.m_iNumShadowCascades, 1, 8))
+      if (ImGui::SliderInt("Num cascades", &m_TerrainRenderParams.num_shadow_cascades, 1, 8))
         CreateShadowMap();
 
       ImGui::Checkbox("Visualize cascades", &m_ShadowSettings.bVisualizeCascades);
@@ -339,7 +339,7 @@ void AtmosphereSample::UpdateUI()
                        "Multi-pass inst\0\0");
 
           ImGui::SliderInt("First Cascade to Ray March", &m_PPAttribs.iFirstCascadeToRayMarch, 0,
-                           m_TerrainRenderParams.m_iNumShadowCascades - 1);
+                           m_TerrainRenderParams.num_shadow_cascades - 1);
           ImGui::HelpMarker("First cascade to use for ray marching. Usually first few cascades are small, and ray "
                             "marching them is inefficient.");
 
@@ -478,7 +478,7 @@ void AtmosphereSample::CreateShadowMap()
   ShadowMapManager::InitInfo SMMgrInitInfo;
   SMMgrInitInfo.Format      = m_TerrainRenderParams.ShadowMapFormat;
   SMMgrInitInfo.Resolution  = m_ShadowSettings.Resolution;
-  SMMgrInitInfo.NumCascades = m_TerrainRenderParams.m_iNumShadowCascades;
+  SMMgrInitInfo.NumCascades = m_TerrainRenderParams.num_shadow_cascades;
   SMMgrInitInfo.ShadowMode  = SHADOW_MODE_PCF;
 
   if (!comparison_sampler_)
@@ -531,7 +531,7 @@ void AtmosphereSample::RenderShadowMap(IDeviceContext* pContext,
   m_ShadowMapMgr.DistributeCascades(DistrInfo, ShadowAttribs);
 
   // Render cascades
-  for (int iCascade = 0; iCascade < m_TerrainRenderParams.m_iNumShadowCascades; ++iCascade)
+  for (int iCascade = 0; iCascade < m_TerrainRenderParams.num_shadow_cascades; ++iCascade)
   {
     auto* pCascadeDSV = m_ShadowMapMgr.GetCascadeDSV(iCascade);
 
@@ -549,7 +549,7 @@ void AtmosphereSample::RenderShadowMap(IDeviceContext* pContext,
       CamAttribs->mViewProjT = WorldToLightProjSpaceMatr.Transpose();
     }
 
-    m_EarthHemisphere.Render(m_pImmediateContext, m_TerrainRenderParams, m_f3CameraPos, WorldToLightProjSpaceMatr,
+    m_EarthHemisphere.Render(m_pImmediateContext, m_TerrainRenderParams,  WorldToLightProjSpaceMatr,
                              nullptr, nullptr, nullptr, true);
   }
 }
@@ -568,7 +568,7 @@ void AtmosphereSample::Render()
   LightAttrs.f4Intensity            = f4ExtraterrestrialSunColor; // *m_fScatteringScale;
   LightAttrs.f4AmbientLight         = float4(0, 0, 0, 0);
 
-  LightAttrs.ShadowAttribs.iNumCascades = m_TerrainRenderParams.m_iNumShadowCascades;
+  LightAttrs.ShadowAttribs.iNumCascades = m_TerrainRenderParams.num_shadow_cascades;
   if (m_ShadowSettings.Resolution >= 2048)
     LightAttrs.ShadowAttribs.fFixedDepthBias = 0.0025f;
   else if (m_ShadowSettings.Resolution >= 1024)
@@ -578,7 +578,7 @@ void AtmosphereSample::Render()
 
   // m_iFirstCascade must be initialized before calling RenderShadowMap()!
   m_PPAttribs.iFirstCascadeToRayMarch =
-    std::min(m_PPAttribs.iFirstCascadeToRayMarch, m_TerrainRenderParams.m_iNumShadowCascades - 1);
+    std::min(m_PPAttribs.iFirstCascadeToRayMarch, m_TerrainRenderParams.num_shadow_cascades - 1);
 
   RenderShadowMap(m_pImmediateContext, LightAttrs, m_mCameraView, m_mCameraProj);
 
@@ -639,7 +639,6 @@ void AtmosphereSample::Render()
     m_bEnableLightScattering ? m_pOffscreenColorBuffer->GetDesc().Format : m_pSwapChain->GetDesc().ColorBufferFormat;
   m_EarthHemisphere.Render(m_pImmediateContext,
                            m_TerrainRenderParams,
-                           m_f3CameraPos,
                            mViewProj,
                            m_ShadowMapMgr.GetSRV(),
                            pPrecomputedNetDensitySRV,
@@ -656,8 +655,8 @@ void AtmosphereSample::Render()
     FrameAttribs.pLightAttribs  = &LightAttrs;
     FrameAttribs.pCameraAttribs = &CamAttribs;
 
-    m_PPAttribs.iNumCascades = m_TerrainRenderParams.m_iNumShadowCascades;
-    m_PPAttribs.fNumCascades = (float)m_TerrainRenderParams.m_iNumShadowCascades;
+    m_PPAttribs.iNumCascades = m_TerrainRenderParams.num_shadow_cascades;
+    m_PPAttribs.fNumCascades = (float)m_TerrainRenderParams.num_shadow_cascades;
 
     FrameAttribs.pcbLightAttribs  = m_pcbLightAttribs;
     FrameAttribs.pcbCameraAttribs = m_pcbCameraAttribs;

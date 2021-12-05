@@ -1,5 +1,5 @@
 
-#include "HostSharedTerrainStructs.fxh"
+#include "../HostSharedTerrainStructs.fxh"
 #include "TerrainShadersCommon.fxh"
 
 Texture2D< uint > g_tex2DElevationMap;
