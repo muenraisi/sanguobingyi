@@ -43,14 +43,14 @@ public:
   AtmosphereSample();
   ~AtmosphereSample();
 
-  virtual void ModifyEngineInitInfo(const ModifyEngineInitInfoAttribs& Attribs) override final;
+  virtual void ModifyEngineInitInfo(const ModifyEngineInitInfoAttribs& attribs) override final;
 
-  virtual void Initialize(const SampleInitInfo& InitInfo) override final;
+  virtual void Initialize(const SampleInitInfo& info) override final;
   virtual void Render() override final;
   virtual void Update(double CurrTime, double ElapsedTime) override final;
   virtual void WindowResize(Uint32 Width, Uint32 Height) override final;
 
-  virtual const Char* GetSampleName() const override final { return "Atmosphere Sample"; }
+  virtual const Char* GetSampleName() const override final { return "±øÞÄ¡¤Èý¹ú"; }
 
 private:
   void UpdateUI();
@@ -65,39 +65,39 @@ private:
   float4x4   m_mCameraView;
   float4x4   m_mCameraProj;
 
-  RefCntAutoPtr<IBuffer> m_pcbCameraAttribs;
-  RefCntAutoPtr<IBuffer> m_pcbLightAttribs;
+  RefCntAutoPtr<IBuffer> camera_attribs_;
+  RefCntAutoPtr<IBuffer> light_attribs_;
 
-  ShadowMapManager m_ShadowMapMgr;
+  ShadowMapManager shadow_mag_manager_;
   struct ShadowSettings
   {
     Uint32 Resolution                 = 1024;
     float  fCascadePartitioningFactor = 0.95f;
     bool   bVisualizeCascades         = false;
     int    iFixedFilterSize           = 5;
-  } m_ShadowSettings;
+  } shadow_settings_;
 
   RefCntAutoPtr<ISampler> comparison_sampler_;
 
-  RenderingParams                m_TerrainRenderParams;
-  EpipolarLightScatteringAttribs m_PPAttribs;
+  RenderingParams                terrain_render_params_;
+  EpipolarLightScatteringAttribs epipolar_light_scattering_attribs_;
 
-  String m_strRawDEMDataFile;
-  String m_strMtrlMaskFile;
-  String m_strTileTexPaths[EarthHemsiphere::NUM_TILE_TEXTURES];
-  String m_strNormalMapTexPaths[EarthHemsiphere::NUM_TILE_TEXTURES];
+  String height_map_path_;
+  String mtrl_mask_path_;
+  String tile_diffuse_tex_paths_[EarthHemsiphere::NUM_TILE_TEXTURES];
+  String tile_normal_tex_paths_[EarthHemsiphere::NUM_TILE_TEXTURES];
 
-  float m_fMinElevation = 0, m_fMaxElevation = 0;
+  float min_elevation_ = 0, max_elevation_ = 0;
 
-  std::unique_ptr<ElevationDataSource> m_pElevDataSource;
-  EarthHemsiphere                      m_EarthHemisphere;
-  bool                                 m_bIsGLDevice = false;
+  std::unique_ptr<ElevationDataSource> elev_data_source_;
+  EarthHemsiphere                      earth_hemisphere_;
+  bool                                 is_gl_device_ = false;
 
-  std::unique_ptr<EpipolarLightScattering> m_pLightSctrPP;
+  std::unique_ptr<EpipolarLightScattering> epipolar_light_scattering_;
 
   bool   m_bEnableLightScattering = true;
   float  m_fElapsedTime           = 0.f;
-  float3 m_f3CustomRlghBeta, m_f3CustomMieBeta, m_f3CustomOzoneAbsoprtion;
+  float3 custom_rlgh_beta_, custom_mie_beta_, custom_ozone_absorption_;
 
   RefCntAutoPtr<ITexture> m_pOffscreenColorBuffer;
   RefCntAutoPtr<ITexture> m_pOffscreenDepthBuffer;
@@ -106,8 +106,8 @@ private:
   float      m_fCameraPitch = 0.18f;
   MouseState m_LastMouseState;
 
-  bool m_bRG16UFmtSupported = false;
-  bool m_bRG32FFmtSupported = false;
+  bool rg16u_fmt_supported = false;
+  bool rg32f_fmt_supported = false;
 };
 
 } // namespace Diligent

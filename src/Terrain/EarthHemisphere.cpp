@@ -779,7 +779,7 @@ void EarthHemsiphere::Create(class ElevationDataSource* data_source,
   VERIFY(vertex_buffer_, "Failed to create vertex_buffer");
 }
 
-void EarthHemsiphere::Render(IDeviceContext*        pContext,
+void EarthHemsiphere::Render(IDeviceContext*        context,
                              const RenderingParams& new_params,
                              const float4x4&        camera_view_proj_matrix,
                              ITextureView*          shadow_map_srv,
@@ -908,28 +908,28 @@ void EarthHemsiphere::Render(IDeviceContext*        pContext,
   ExtractViewFrustumPlanesFromMatrix(camera_view_proj_matrix, view_frustum, dev_type == RENDER_DEVICE_TYPE_D3D11 || dev_type == RENDER_DEVICE_TYPE_D3D12);
 
   {
-    MapHelper<TerrainAttribs> terrain_attribs(pContext, terrain_attribs_buffer_, MAP_WRITE, MAP_FLAG_DISCARD);
+    MapHelper<TerrainAttribs> terrain_attribs(context, terrain_attribs_buffer_, MAP_WRITE, MAP_FLAG_DISCARD);
     *terrain_attribs = params_.terrain_attribs;
   }
 
   IBuffer* ppBuffers[1] = {vertex_buffer_};
-  pContext->SetVertexBuffers(0, 1, ppBuffers, nullptr, RESOURCE_STATE_TRANSITION_MODE_TRANSITION, SET_VERTEX_BUFFERS_FLAG_RESET);
+  context->SetVertexBuffers(0, 1, ppBuffers, nullptr, RESOURCE_STATE_TRANSITION_MODE_TRANSITION, SET_VERTEX_BUFFERS_FLAG_RESET);
 
   if (z_only_pass)
   {
-    pContext->SetPipelineState(hemisphere_z_only_pso_);
-    pContext->CommitShaderResources(hemisphere_z_only_srb_, RESOURCE_STATE_TRANSITION_MODE_TRANSITION);
+    context->SetPipelineState(hemisphere_z_only_pso_);
+    context->CommitShaderResources(hemisphere_z_only_srb_, RESOURCE_STATE_TRANSITION_MODE_TRANSITION);
   }
   else
   {
     shadow_map_srv->SetSampler(comparison_sampler_);
-    pContext->SetPipelineState(hemisphere_pso_);
+    context->SetPipelineState(hemisphere_pso_);
 
     hemisphere_srb_->GetVariableByName(SHADER_TYPE_PIXEL, "g_tex2DShadowMap")->Set(shadow_map_srv);
     hemisphere_srb_->GetVariableByName(SHADER_TYPE_VERTEX, "g_tex2DOccludedNetDensityToAtmTop")->Set(pre_computeD_net_density_srv);
     hemisphere_srb_->GetVariableByName(SHADER_TYPE_VERTEX, "g_tex2DAmbientSkylight")->Set(ambient_skylight_srv);
 
-    pContext->CommitShaderResources(hemisphere_srb_, RESOURCE_STATE_TRANSITION_MODE_TRANSITION);
+    context->CommitShaderResources(hemisphere_srb_, RESOURCE_STATE_TRANSITION_MODE_TRANSITION);
   }
 
   for (auto mesh_iter = sphere_meshes_.begin(); mesh_iter != sphere_meshes_.end(); ++mesh_iter)
@@ -937,9 +937,9 @@ void EarthHemsiphere::Render(IDeviceContext*        pContext,
     if (GetBoxVisibility(view_frustum, mesh_iter->bound_box, z_only_pass ? FRUSTUM_PLANE_FLAG_OPEN_NEAR : FRUSTUM_PLANE_FLAG_FULL_FRUSTUM) !=
         BoxVisibility::Invisible)
     {
-      pContext->SetIndexBuffer(mesh_iter->index_buffer, 0, RESOURCE_STATE_TRANSITION_MODE_TRANSITION);
+      context->SetIndexBuffer(mesh_iter->index_buffer, 0, RESOURCE_STATE_TRANSITION_MODE_TRANSITION);
       DrawIndexedAttribs draw_attrs(mesh_iter->num_indices, VT_UINT32, DRAW_FLAG_VERIFY_ALL);
-      pContext->DrawIndexed(draw_attrs);
+      context->DrawIndexed(draw_attrs);
     }
   }
 }
