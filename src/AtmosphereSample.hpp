@@ -58,10 +58,10 @@ private:
   void RenderShadowMap(IDeviceContext* pContext, LightAttribs& LightAttribs, const float4x4& mCameraView,
                        const float4x4& mCameraProj);
 
-  float3 m_f3LightDir = {-0.554699242f, -0.0599640049f, -0.829887390f};
+  float3 light_dir_ = {-0.554699242f, -0.0599640049f, -0.829887390f};
 
   Quaternion m_CameraRotation = {0, 0, 0, 1};
-  float3     m_f3CameraPos    = {0, 8000.f, 0};
+  float3     camera_pos_    = {0, 8000.f, 0};
   float4x4   m_mCameraView;
   float4x4   m_mCameraProj;
 
@@ -73,7 +73,7 @@ private:
   {
     Uint32 Resolution                 = 1024;
     float  fCascadePartitioningFactor = 0.95f;
-    bool   bVisualizeCascades         = false;
+    bool   visualize_cascades         = false;
     int    iFixedFilterSize           = 5;
   } shadow_settings_;
 
@@ -95,7 +95,7 @@ private:
 
   std::unique_ptr<EpipolarLightScattering> epipolar_light_scattering_;
 
-  bool   m_bEnableLightScattering = true;
+  bool   enable_light_scattering_ = true;
   float  m_fElapsedTime           = 0.f;
   float3 custom_rlgh_beta_, custom_mie_beta_, custom_ozone_absorption_;
 

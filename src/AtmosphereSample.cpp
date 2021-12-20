@@ -56,8 +56,8 @@ void AtmosphereSample::Initialize(const SampleInitInfo& info)
 {
   SampleBase::Initialize(info);
 
-  const auto& deviceInfo = info.pDevice->GetDeviceInfo();
-  is_gl_device_          = deviceInfo.IsGLDevice();
+  const auto& deviceInfo  = info.pDevice->GetDeviceInfo();
+  is_gl_device_           = deviceInfo.IsGLDevice();
   const auto adapter_type = info.pDevice->GetAdapterInfo().Type;
   if (adapter_type == ADAPTER_TYPE_INTEGRATED)
   {
@@ -137,43 +137,45 @@ void AtmosphereSample::Initialize(const SampleInitInfo& info)
 
 void AtmosphereSample::UpdateUI()
 {
-  ImGui::SetNextWindowPos(ImVec2(10, 10), ImGuiCond_FirstUseEver);
-  if (ImGui::Begin("Settings", nullptr, ImGuiWindowFlags_AlwaysAutoResize))
+  ImGui::SetNextWindowPos(ImVec2(0, 0), ImGuiCond_FirstUseEver);
+  if (ImGui::Begin("设置", nullptr, ImGuiWindowFlags_AlwaysAutoResize))
   {
-    ImGui::gizmo3D("Light direction", static_cast<float3&>(m_f3LightDir), ImGui::GetTextLineHeight() * 10);
-    ImGui::SliderFloat("Camera altitude", &m_f3CameraPos.y, 2000, 100000);
+    ImGui::gizmo3D("光照方向", static_cast<float3&>(light_dir_), ImGui::GetTextLineHeight() * 10);
+    ImGui::SliderFloat("相机高度", &camera_pos_.y, 2000, 100000);
 
     ImGui::SetNextTreeNodeOpen(true, ImGuiCond_FirstUseEver);
-    if (ImGui::TreeNode("Shadows"))
+    if (ImGui::TreeNode("阴影"))
     {
       {
         constexpr int MinShadowMapSize = 512;
         int           ShadowMapComboId = 0;
         while ((MinShadowMapSize << ShadowMapComboId) != static_cast<int>(shadow_settings_.Resolution)) ++ShadowMapComboId;
-        if (ImGui::Combo("Shadow map size", &ShadowMapComboId,
-                         "512\0"
-                         "1024\0"
-                         "2048\0\0"))
+        if (ImGui::Combo("图左移数", &ShadowMapComboId,
+                         "0\0"
+                         "1\0"
+                         "2\0"
+                         "4\0"
+                         "8\0\0"))
         {
           shadow_settings_.Resolution = MinShadowMapSize << ShadowMapComboId;
           CreateShadowMap();
         }
       }
 
-      if (ImGui::SliderInt("Num cascades", &terrain_render_params_.num_shadow_cascades, 1, 8)) CreateShadowMap();
+      if (ImGui::SliderInt("级数", &terrain_render_params_.num_shadow_cascades, 1, 8)) CreateShadowMap();
 
-      ImGui::Checkbox("Visualize cascades", &shadow_settings_.bVisualizeCascades);
+      ImGui::Checkbox("显示分级", &shadow_settings_.visualize_cascades);
 
       ImGui::TreePop();
     }
 
-    ImGui::Checkbox("Enable Light Scattering", &m_bEnableLightScattering);
+    ImGui::Checkbox("开启光散", &enable_light_scattering_);
 
-    if (m_bEnableLightScattering)
+    if (enable_light_scattering_)
     {
       if (ImGui::BeginTabBar("##tabs", ImGuiTabBarFlags_None))
       {
-        if (ImGui::BeginTabItem("Basic"))
+        if (ImGui::BeginTabItem("基本"))
         {
           ImGui::Checkbox("Enable light shafts", &epipolar_light_scattering_attribs_.bEnableLightShafts);
 
@@ -460,7 +462,7 @@ void AtmosphereSample::RenderShadowMap(IDeviceContext* pContext, LightAttribs& L
   ShadowMapManager::DistributeCascadeInfo DistrInfo;
   DistrInfo.pCameraView         = &mCameraView;
   DistrInfo.pCameraProj         = &mCameraProj;
-  DistrInfo.pLightDir           = &m_f3LightDir;
+  DistrInfo.pLightDir           = &light_dir_;
   DistrInfo.fPartitioningFactor = 0.95f;
   DistrInfo.SnapCascades        = true;
   DistrInfo.EqualizeExtents     = true;
@@ -511,7 +513,7 @@ void AtmosphereSample::Render()
   float4x4 mViewProj = m_mCameraView * m_mCameraProj;
 
   LightAttribs LightAttrs;
-  LightAttrs.f4Direction   = m_f3LightDir;
+  LightAttrs.f4Direction   = light_dir_;
   LightAttrs.f4Direction.w = 0;
 
   float4 f4ExtraterrestrialSunColor = float4(10, 10, 10, 10);
@@ -530,7 +532,7 @@ void AtmosphereSample::Render()
 
   RenderShadowMap(m_pImmediateContext, LightAttrs, m_mCameraView, m_mCameraProj);
 
-  LightAttrs.ShadowAttribs.bVisualizeCascades = shadow_settings_.bVisualizeCascades;
+  LightAttrs.ShadowAttribs.bVisualizeCascades = shadow_settings_.visualize_cascades;
 
   {
     MapHelper<LightAttribs> LightAttribsCBData(m_pImmediateContext, light_attribs_, MAP_WRITE, MAP_FLAG_DISCARD);
@@ -548,9 +550,9 @@ void AtmosphereSample::Render()
 
   const float ClearColor[] = {0.350f, 0.350f, 0.350f, 1.0f};
   const float Zero[]       = {0.f, 0.f, 0.f, 0.f};
-  m_pImmediateContext->ClearRenderTarget(pRTV, m_bEnableLightScattering ? Zero : ClearColor, RESOURCE_STATE_TRANSITION_MODE_TRANSITION);
+  m_pImmediateContext->ClearRenderTarget(pRTV, enable_light_scattering_ ? Zero : ClearColor, RESOURCE_STATE_TRANSITION_MODE_TRANSITION);
 
-  if (m_bEnableLightScattering)
+  if (enable_light_scattering_)
   {
     pRTV = m_pOffscreenColorBuffer->GetDefaultView(TEXTURE_VIEW_RENDER_TARGET);
     pDSV = m_pOffscreenDepthBuffer->GetDefaultView(TEXTURE_VIEW_DEPTH_STENCIL);
@@ -569,7 +571,7 @@ void AtmosphereSample::Render()
   m_mCameraProj.GetNearFarClipPlanes(fNearPlane, fFarPlane, is_gl_device_);
   CamAttribs.fNearPlaneZ      = fNearPlane;
   CamAttribs.fFarPlaneZ       = fFarPlane * 0.999999f;
-  CamAttribs.f4Position       = m_f3CameraPos;
+  CamAttribs.f4Position       = camera_pos_;
   CamAttribs.f4ViewportSize.x = static_cast<float>(m_pSwapChain->GetDesc().Width);
   CamAttribs.f4ViewportSize.y = static_cast<float>(m_pSwapChain->GetDesc().Height);
   CamAttribs.f4ViewportSize.z = 1.f / CamAttribs.f4ViewportSize.x;
@@ -583,11 +585,11 @@ void AtmosphereSample::Render()
   // Render terrain
   auto* pPrecomputedNetDensitySRV = epipolar_light_scattering_->GetPrecomputedNetDensitySRV();
   terrain_render_params_.DstRTVFormat =
-    m_bEnableLightScattering ? m_pOffscreenColorBuffer->GetDesc().Format : m_pSwapChain->GetDesc().ColorBufferFormat;
+    enable_light_scattering_ ? m_pOffscreenColorBuffer->GetDesc().Format : m_pSwapChain->GetDesc().ColorBufferFormat;
   earth_hemisphere_.Render(m_pImmediateContext, terrain_render_params_, mViewProj, shadow_mag_manager_.GetSRV(), pPrecomputedNetDensitySRV,
                            pAmbientSkyLightSRV, false);
 
-  if (m_bEnableLightScattering)
+  if (enable_light_scattering_)
   {
     EpipolarLightScattering::FrameAttribs FrameAttribs;
 
@@ -744,9 +746,9 @@ void AtmosphereSample::Update(double CurrTime, double ElapsedTime)
   }
   m_CameraRotation =
     Quaternion::RotationFromAxisAngle(float3{1, 0, 0}, -m_fCameraPitch) * Quaternion::RotationFromAxisAngle(float3{0, 1, 0}, -m_fCameraYaw);
-  m_f3CameraPos.y += mouseState.WheelDelta * 500.f;
-  m_f3CameraPos.y = std::max(m_f3CameraPos.y, 2000.f);
-  m_f3CameraPos.y = std::min(m_f3CameraPos.y, 100000.f);
+  camera_pos_.y += mouseState.WheelDelta * 500.f;
+  camera_pos_.y = std::max(camera_pos_.y, 2000.f);
+  camera_pos_.y = std::min(camera_pos_.y, 100000.f);
 
   auto CameraRotationMatrix = m_CameraRotation.ToMatrix();
 
@@ -758,7 +760,7 @@ void AtmosphereSample::Update(double CurrTime, double ElapsedTime)
     float  fPitchDelta = MouseDeltaY * LightRotationSpeed;
     float3 WorldUp{CameraRotationMatrix._12, CameraRotationMatrix._22, CameraRotationMatrix._32};
     float3 WorldRight{CameraRotationMatrix._11, CameraRotationMatrix._21, CameraRotationMatrix._31};
-    m_f3LightDir = float4(m_f3LightDir, 0) * float4x4::RotationArbitrary(WorldUp, fYawDelta) * float4x4::RotationArbitrary(WorldRight, fPitchDelta);
+    light_dir_ = float4(light_dir_, 0) * float4x4::RotationArbitrary(WorldUp, fYawDelta) * float4x4::RotationArbitrary(WorldRight, fPitchDelta);
   }
 
   SampleBase::Update(CurrTime, ElapsedTime);
@@ -770,7 +772,7 @@ void AtmosphereSample::Update(double CurrTime, double ElapsedTime)
   // Set world/view/proj matrices and global shader constants
   float aspectRatio = (float)SCDesc.Width / SCDesc.Height;
 
-  m_mCameraView = float4x4::Translation(-m_f3CameraPos) * CameraRotationMatrix;
+  m_mCameraView = float4x4::Translation(-camera_pos_) * CameraRotationMatrix;
 
   // This projection matrix is only used to set up directions in view frustum
   // Actual near and far planes are ignored
@@ -780,7 +782,7 @@ void AtmosphereSample::Update(double CurrTime, double ElapsedTime)
   float  fEarthRadius = AirScatteringAttribs().fEarthRadius;
   float3 EarthCenter(0, -fEarthRadius, 0);
   float  fNearPlaneZ, fFarPlaneZ;
-  ComputeApproximateNearFarPlaneDist(m_f3CameraPos, m_mCameraView, mTmpProj, EarthCenter, fEarthRadius, fEarthRadius + min_elevation_,
+  ComputeApproximateNearFarPlaneDist(camera_pos_, m_mCameraView, mTmpProj, EarthCenter, fEarthRadius, fEarthRadius + min_elevation_,
                                      fEarthRadius + max_elevation_, fNearPlaneZ, fFarPlaneZ);
   fNearPlaneZ = std::max(fNearPlaneZ, 50.f);
   fFarPlaneZ  = std::max(fFarPlaneZ, fNearPlaneZ + 100.f);
