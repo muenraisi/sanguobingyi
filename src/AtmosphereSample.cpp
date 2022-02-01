@@ -169,7 +169,7 @@ void AtmosphereSample::UpdateUI()
       ImGui::TreePop();
     }
 
-    ImGui::Checkbox("开启光散", &enable_light_scattering_);
+    ImGui::Checkbox("启动光散", &enable_light_scattering_);
 
     if (enable_light_scattering_)
     {
