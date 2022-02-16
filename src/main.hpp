@@ -33,7 +33,7 @@
 namespace Diligent
 {
 
-class Tutorial08_Tessellation final : public SampleBase
+class main final : public SampleBase
 {
 public:
     virtual void ModifyEngineInitInfo(const ModifyEngineInitInfoAttribs& Attribs) override final;
@@ -42,7 +42,7 @@ public:
     virtual void Render() override final;
     virtual void Update(double CurrTime, double ElapsedTime) override final;
 
-    virtual const Char* GetSampleName() const override final { return "Tutorial08: Tessellation"; }
+    virtual const Char* GetSampleName() const override final { return "Èý¹ú ±øÞÄ"; }
 
 private:
     void CreatePipelineStates();
